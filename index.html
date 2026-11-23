@@ -176,7 +176,7 @@
         }
 
         const customer = getSignedInCustomer(shop);
-        const isAdmin = shop.email === "admin@goodform.test";
+        const isAdmin = shop.email === "store-admin";
         if (isAdmin) {
           accountLink.textContent = "Admin";
           accountLink.href = "admin.html";

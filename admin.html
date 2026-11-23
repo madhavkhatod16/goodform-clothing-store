@@ -147,7 +147,7 @@
 
       function loadAdminShop() {
         const shop = loadShop();
-        if (shop.email !== "admin@goodform.test") {
+        if (shop.email !== "store-admin") {
           document.getElementById("main-content").hidden = true;
           alert("Sign in with the demo admin account to manage the store.");
           window.location.replace("login.html");

@@ -60,7 +60,6 @@
       </form>
 
       <p class="demo-note muted">Use a made-up password for this demo.</p>
-      <p class="demo-note muted">Sign in as demo admin with <strong>admin@goodform.test</strong> / <strong>admin123</strong>.</p>
     </main>
 
     <footer class="site-footer">
@@ -80,7 +79,7 @@
       const signupForm = document.getElementById("signup-form");
       const loginTab = document.getElementById("show-login");
       const signupTab = document.getElementById("show-signup");
-      const adminEmail = "admin@goodform.test";
+      const adminEmail = "admin@gmail.com";
 
       function showSignup(show) {
         loginForm.hidden = show;
@@ -130,7 +129,7 @@
         const shop = loadShop();
         const email = document.getElementById("email").value.trim().toLowerCase();
         const password = document.getElementById("password").value;
-        const isAdmin = email === adminEmail && password === "admin123";
+        const isAdmin = email === adminEmail && password === "Admin@12345";
         let customer;
         for (let accountIndex = 0; accountIndex < shop.customers.length; accountIndex++) {
           const account = shop.customers[accountIndex];
@@ -145,7 +144,11 @@
           return;
         }
 
-        shop.email = email;
+        if (isAdmin) {
+          shop.email = "store-admin";
+        } else {
+          shop.email = email;
+        }
         saveShop(shop);
 
         if (isAdmin) {
