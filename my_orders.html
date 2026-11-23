@@ -93,62 +93,6 @@
     <script>
       const shop = readTab();
 
-      function readTab() {
-        const shop = { email: "", products: null, cart: [] };
-        const values = window.name.split("\n");
-        if (values[0] !== "goodform-tab") {
-          return shop;
-        }
-
-        shop.email = values[1];
-        const productCount = Number(values[2]);
-        let index = 3;
-
-        if (productCount >= 0) {
-          shop.products = [];
-          for (let number = 0; number < productCount; number++) {
-            shop.products.push({
-              id: values[index],
-              name: values[index + 1],
-              category: values[index + 2],
-              color: values[index + 3],
-              price: Number(values[index + 4]),
-              stock: Number(values[index + 5]),
-              image: values[index + 6]
-            });
-            index += 7;
-          }
-        }
-
-        for (; index + 1 < values.length; index += 2) {
-          shop.cart.push({
-            productId: values[index],
-            quantity: Number(values[index + 1])
-          });
-        }
-        return shop;
-      }
-
-      function saveTab() {
-        let productCount = -1;
-        if (shop.products !== null) {
-          productCount = shop.products.length;
-        }
-
-        const values = ["goodform-tab", shop.email, productCount];
-        for (let index = 0; index < productCount; index++) {
-          const product = shop.products[index];
-          values.push(product.id, product.name, product.category, product.color);
-          values.push(product.price, product.stock, product.image);
-        }
-
-        for (let index = 0; index < shop.cart.length; index++) {
-          const item = shop.cart[index];
-          values.push(item.productId, item.quantity);
-        }
-        window.name = values.join("\n");
-      }
-
       const ordersList = document.getElementById("orders");
       const orderTemplate = document.getElementById("order-template");
 
@@ -169,9 +113,8 @@
         let hasOrders = false;
 
         for (let orderId = nextOrderId() - 1; orderId >= 1001; orderId--) {
-          const saved = localStorage.getItem("goodform-order-" + orderId);
-          const order = saved.split("\n");
-          if (order[0] !== email) {
+          const order = readOrder(orderId);
+          if (order.email !== email) {
             continue;
           }
 
@@ -179,34 +122,32 @@
           const card = orderTemplate.content.cloneNode(true);
           card.querySelector("article").id = "order-" + orderId;
           card.querySelector("h2").textContent = "Order #GF-" + orderId;
-          card.querySelector(".order-date").textContent = new Date(order[2]).toLocaleDateString();
-          card.querySelector(".order-total").textContent = money(Number(order[6]));
+          card.querySelector(".order-date").textContent = new Date(order.date).toLocaleDateString();
+          card.querySelector(".order-total").textContent = money(order.total);
           const status = card.querySelector(".status");
-          status.textContent = order[3];
-          if (order[3] === "Pending") {
+          status.textContent = order.status;
+          if (order.status === "Pending") {
             status.classList.add("status-pending");
           }
 
           const body = card.querySelector("tbody");
-          for (let index = 7; index < order.length; index += 3) {
-            const name = order[index];
-            const price = Number(order[index + 1]);
-            const quantity = Number(order[index + 2]);
+          for (let index = 0; index < order.items.length; index++) {
+            const item = order.items[index];
             const row = body.insertRow();
-            row.insertCell().textContent = name;
-            row.insertCell().textContent = quantity;
-            row.insertCell().textContent = money(price);
-            row.insertCell().textContent = money(price * quantity);
+            row.insertCell().textContent = item.name;
+            row.insertCell().textContent = item.quantity;
+            row.insertCell().textContent = money(item.price);
+            row.insertCell().textContent = money(item.price * item.quantity);
           }
 
-          card.querySelector(".bill-subtotal").textContent = money(Number(order[4]));
+          card.querySelector(".bill-subtotal").textContent = money(order.subtotal);
           const shipping = card.querySelector(".bill-shipping");
-          if (Number(order[5]) === 0) {
+          if (order.shipping === 0) {
             shipping.textContent = "Free";
           } else {
-            shipping.textContent = money(Number(order[5]));
+            shipping.textContent = money(order.shipping);
           }
-          card.querySelector(".bill-total").textContent = money(Number(order[6]));
+          card.querySelector(".bill-total").textContent = money(order.total);
           card.querySelector("details").open = window.location.hash === "#order-" + orderId;
           ordersList.appendChild(card);
         }
@@ -223,6 +164,34 @@
         return shop.email;
       }
 
+      function readOrder(orderId) {
+        const key = "goodform-order-" + orderId;
+        const saved = localStorage.getItem(key);
+        const lines = saved.split("\n");
+
+        const order = {
+          email: lines[0],
+          customerName: lines[1],
+          date: lines[2],
+          status: lines[3],
+          subtotal: Number(lines[4]),
+          shipping: Number(lines[5]),
+          total: Number(lines[6]),
+          items: []
+        };
+
+        for (let index = 7; index < lines.length; index += 3) {
+          const item = {
+            name: lines[index],
+            price: Number(lines[index + 1]),
+            quantity: Number(lines[index + 2])
+          };
+          order.items.push(item);
+        }
+
+        return order;
+      }
+
       function nextOrderId() {
         let orderId = 1001;
         while (localStorage.getItem("goodform-order-" + orderId)) {
@@ -233,6 +202,68 @@
 
       function money(cents) {
         return "$" + (cents / 100).toFixed(2);
+      }
+
+      function readTab() {
+        const shop = { email: "", products: null, cart: [] };
+        const lines = window.name.split("\n");
+        const tabName = lines.shift();
+
+        if (tabName !== "goodform-tab") {
+          return shop;
+        }
+
+        shop.email = lines.shift();
+        const productCount = Number(lines.shift());
+
+        if (productCount >= 0) {
+          shop.products = [];
+
+          for (let index = 0; index < productCount; index++) {
+            const product = {
+              id: lines.shift(),
+              name: lines.shift(),
+              category: lines.shift(),
+              color: lines.shift(),
+              price: Number(lines.shift()),
+              stock: Number(lines.shift()),
+              image: lines.shift()
+            };
+            shop.products.push(product);
+          }
+        }
+
+        for (let index = 0; index < lines.length; index += 2) {
+          const item = {
+            productId: lines[index],
+            quantity: Number(lines[index + 1])
+          };
+          shop.cart.push(item);
+        }
+
+        return shop;
+      }
+
+      function saveTab() {
+        let productCount = -1;
+        if (shop.products !== null) {
+          productCount = shop.products.length;
+        }
+
+        const lines = ["goodform-tab", shop.email, productCount];
+
+        for (let index = 0; index < productCount; index++) {
+          const product = shop.products[index];
+          lines.push(product.id, product.name, product.category, product.color);
+          lines.push(product.price, product.stock, product.image);
+        }
+
+        for (let index = 0; index < shop.cart.length; index++) {
+          const item = shop.cart[index];
+          lines.push(item.productId, item.quantity);
+        }
+
+        window.name = lines.join("\n");
       }
 
       document.getElementById("sign-out").addEventListener("click", function () {
