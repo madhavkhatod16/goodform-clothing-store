@@ -1,16 +1,252 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=index.html#orders">
-    <title>My orders | Goodform</title>
+    <title>My Orders | Goodform</title>
     <link rel="stylesheet" href="style.css">
   </head>
+
   <body>
-    <main class="container inner-page">
-      <h1>My orders</h1>
-      <a class="text-link" href="index.html#orders">Open my orders</a>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <p class="announcement">Free shipping on orders over $75</p>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="index.html#new-arrivals">New arrivals</a>
+          <a href="index.html#the-edit">The edit</a>
+          <a href="my_orders.html" aria-current="page">Orders</a>
+        </nav>
+        <nav class="account-nav" aria-label="Account and bag">
+          <button class="text-button" id="sign-out" type="button">Sign out</button>
+          <a class="bag-link" href="cart.html"><span class="bag-icon" aria-hidden="true"></span><span id="bag-count">Bag (0)</span></a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container inner-page" id="main-content">
+      <div class="page-intro">
+        <h1>My orders</h1>
+        <p class="muted">View delivery status and bills for your orders.</p>
+      </div>
+
+      <p class="muted" id="empty-orders" hidden>You haven’t placed an order yet.</p>
+      <div id="orders"></div>
     </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="footer-nav" aria-label="Footer links">
+          <a href="index.html#new-arrivals">Shop</a>
+          <a href="login.html">Account</a>
+          <a href="my_orders.html">Orders</a>
+        </nav>
+        <p>&copy; 2026 Goodform</p>
+      </div>
+    </footer>
+
+    <template id="order-template">
+      <article class="panel order-card">
+        <header class="order-heading">
+          <div>
+            <h2></h2>
+            <p class="muted order-date"></p>
+          </div>
+          <p><span class="status"></span> <strong class="order-total"></strong></p>
+        </header>
+        <details>
+          <summary>View bill</summary>
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Price</th>
+                <th scope="col">Amount</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <dl class="bill-totals">
+            <div>
+              <dt>Subtotal</dt>
+              <dd class="bill-subtotal">
+              </dd>
+            </div>
+            <div>
+              <dt>Shipping</dt>
+              <dd class="bill-shipping">
+              </dd>
+            </div>
+            <div class="cart-total">
+              <dt>Total</dt>
+              <dd class="bill-total">
+              </dd>
+            </div>
+          </dl>
+        </details>
+      </article>
+    </template>
+
+    <script>
+      const shop = readTab();
+
+      function readTab() {
+        const shop = { email: "", products: null, cart: [] };
+        const values = window.name.split("\n");
+        if (values[0] !== "goodform-tab") {
+          return shop;
+        }
+
+        shop.email = values[1];
+        const productCount = Number(values[2]);
+        let index = 3;
+
+        if (productCount >= 0) {
+          shop.products = [];
+          for (let number = 0; number < productCount; number++) {
+            shop.products.push({
+              id: values[index],
+              name: values[index + 1],
+              category: values[index + 2],
+              color: values[index + 3],
+              price: Number(values[index + 4]),
+              stock: Number(values[index + 5]),
+              image: values[index + 6]
+            });
+            index += 7;
+          }
+        }
+
+        for (; index + 1 < values.length; index += 2) {
+          shop.cart.push({
+            productId: values[index],
+            quantity: Number(values[index + 1])
+          });
+        }
+        return shop;
+      }
+
+      function saveTab() {
+        let productCount = -1;
+        if (shop.products !== null) {
+          productCount = shop.products.length;
+        }
+
+        const values = ["goodform-tab", shop.email, productCount];
+        for (let index = 0; index < productCount; index++) {
+          const product = shop.products[index];
+          values.push(product.id, product.name, product.category, product.color);
+          values.push(product.price, product.stock, product.image);
+        }
+
+        for (let index = 0; index < shop.cart.length; index++) {
+          const item = shop.cart[index];
+          values.push(item.productId, item.quantity);
+        }
+        window.name = values.join("\n");
+      }
+
+      const ordersList = document.getElementById("orders");
+      const orderTemplate = document.getElementById("order-template");
+
+      function showOrders() {
+        const email = getCustomerEmail();
+        if (!email) {
+          return;
+        }
+
+        const cart = shop.cart;
+        let count = 0;
+        for (let index = 0; index < cart.length; index++) {
+          count += cart[index].quantity;
+        }
+        document.getElementById("bag-count").textContent = "Bag (" + count + ")";
+
+        ordersList.textContent = "";
+        let hasOrders = false;
+
+        for (let orderId = nextOrderId() - 1; orderId >= 1001; orderId--) {
+          const saved = localStorage.getItem("goodform-order-" + orderId);
+          const order = saved.split("\n");
+          if (order[0] !== email) {
+            continue;
+          }
+
+          hasOrders = true;
+          const card = orderTemplate.content.cloneNode(true);
+          card.querySelector("article").id = "order-" + orderId;
+          card.querySelector("h2").textContent = "Order #GF-" + orderId;
+          card.querySelector(".order-date").textContent = new Date(order[2]).toLocaleDateString();
+          card.querySelector(".order-total").textContent = money(Number(order[6]));
+          const status = card.querySelector(".status");
+          status.textContent = order[3];
+          if (order[3] === "Pending") {
+            status.classList.add("status-pending");
+          }
+
+          const body = card.querySelector("tbody");
+          for (let index = 7; index < order.length; index += 3) {
+            const name = order[index];
+            const price = Number(order[index + 1]);
+            const quantity = Number(order[index + 2]);
+            const row = body.insertRow();
+            row.insertCell().textContent = name;
+            row.insertCell().textContent = quantity;
+            row.insertCell().textContent = money(price);
+            row.insertCell().textContent = money(price * quantity);
+          }
+
+          card.querySelector(".bill-subtotal").textContent = money(Number(order[4]));
+          const shipping = card.querySelector(".bill-shipping");
+          if (Number(order[5]) === 0) {
+            shipping.textContent = "Free";
+          } else {
+            shipping.textContent = money(Number(order[5]));
+          }
+          card.querySelector(".bill-total").textContent = money(Number(order[6]));
+          card.querySelector("details").open = window.location.hash === "#order-" + orderId;
+          ordersList.appendChild(card);
+        }
+
+        document.getElementById("empty-orders").hidden = hasOrders;
+      }
+
+      function getCustomerEmail() {
+        if (!shop.email || shop.email === "store-admin") {
+          alert("Please sign in as a customer.");
+          window.location.replace("login.html");
+          return "";
+        }
+        return shop.email;
+      }
+
+      function nextOrderId() {
+        let orderId = 1001;
+        while (localStorage.getItem("goodform-order-" + orderId)) {
+          orderId++;
+        }
+        return orderId;
+      }
+
+      function money(cents) {
+        return "$" + (cents / 100).toFixed(2);
+      }
+
+      document.getElementById("sign-out").addEventListener("click", function () {
+        shop.email = "";
+        shop.cart = [];
+        saveTab();
+        window.location.replace("index.html");
+      });
+      window.addEventListener("pageshow", function (event) {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+      showOrders();
+    </script>
   </body>
 </html>

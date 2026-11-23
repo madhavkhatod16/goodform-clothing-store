@@ -1,16 +1,479 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=index.html#admin">
-    <title>Store admin | Goodform</title>
+    <title>Product Admin | Goodform</title>
     <link rel="stylesheet" href="style.css">
   </head>
+
   <body>
-    <main class="container inner-page">
-      <h1>Store admin</h1>
-      <a class="text-link" href="index.html#admin">Open store admin</a>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="account-nav" aria-label="Admin navigation">
+          <a href="index.html">View storefront</a>
+          <button class="text-button" id="sign-out" type="button">Sign out</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container inner-page" id="main-content" hidden>
+      <div class="page-intro">
+        <p class="eyebrow">Store admin</p>
+        <h1>Manage store</h1>
+      </div>
+
+      <section class="admin-section" aria-labelledby="orders-title">
+        <div class="section-heading">
+          <h2 id="orders-title">Orders</h2>
+          <p>Total amount <strong id="total-amount">$0.00</strong></p>
+        </div>
+        <p class="muted" id="empty-orders" hidden>No orders yet.</p>
+        <div class="table-scroll" id="orders-table" role="region" aria-label="Customer orders" tabindex="0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Order</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Items</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Status</th>
+                <th scope="col">Delivery</th>
+              </tr>
+            </thead>
+            <tbody id="order-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="admin-section" aria-labelledby="products-title">
+        <div class="section-heading">
+          <h2 id="products-title">Products</h2>
+        </div>
+
+        <details class="panel add-product" id="add-product-panel">
+          <summary>Add a product</summary>
+          <form class="stack-form product-form" id="product-form" method="post">
+            <div>
+              <label for="product-name">Name</label>
+              <input id="product-name" type="text" maxlength="70" required>
+            </div>
+            <div>
+              <label for="category">Category</label>
+              <input id="category" type="text" maxlength="40" required>
+            </div>
+            <div>
+              <label for="color">Color</label>
+              <input id="color" type="text" maxlength="40" required>
+            </div>
+            <div>
+              <label for="price">Price ($)</label>
+              <input id="price" type="number" min="0.01" max="99999" step="0.01" required>
+            </div>
+            <div>
+              <label for="stock">Stock</label>
+              <input id="stock" type="number" min="0" max="9999" step="1" required>
+            </div>
+            <div class="photo-field">
+              <label for="product-photo">Photo link (optional)</label>
+              <p class="photo-hint muted" id="photo-hint">Paste a direct link to an image online.</p>
+              <input id="product-photo" type="url" maxlength="2048" aria-describedby="photo-hint">
+            </div>
+            <button class="button" type="submit">Add product</button>
+          </form>
+        </details>
+
+        <p class="muted" id="empty-products" hidden>No products in the store.</p>
+        <div class="table-scroll" id="products-table" role="region" aria-label="Product inventory" tabindex="0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Category</th>
+                <th scope="col">Price</th>
+                <th scope="col">Stock</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody id="product-rows"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <p>&copy; 2026 Goodform</p>
+      </div>
+    </footer>
+
+    <template id="admin-product-template">
+      <tr>
+        <th scope="row"></th>
+        <td class="category"></td>
+        <td class="price"></td>
+        <td>
+          <form class="line-actions">
+            <input type="number" min="0" max="9999" step="1" required>
+            <button class="text-button" type="submit">Update</button>
+          </form>
+        </td>
+        <td>
+          <button class="text-button delete-product" type="button">Delete</button>
+        </td>
+      </tr>
+    </template>
+
+    <template id="admin-order-template">
+      <tr>
+        <th scope="row"></th>
+        <td class="customer"></td>
+        <td class="items"></td>
+        <td class="price"></td>
+        <td><span class="status"></span></td>
+        <td>
+          <button class="text-button" type="button">Mark delivered</button>
+        </td>
+      </tr>
+    </template>
+
+    <script>
+      const shop = readTab();
+
+      function readTab() {
+        const shop = { email: "", products: null, cart: [] };
+        const values = window.name.split("\n");
+        if (values[0] !== "goodform-tab") {
+          return shop;
+        }
+
+        shop.email = values[1];
+        const productCount = Number(values[2]);
+        let index = 3;
+
+        if (productCount >= 0) {
+          shop.products = [];
+          for (let number = 0; number < productCount; number++) {
+            shop.products.push({
+              id: values[index],
+              name: values[index + 1],
+              category: values[index + 2],
+              color: values[index + 3],
+              price: Number(values[index + 4]),
+              stock: Number(values[index + 5]),
+              image: values[index + 6]
+            });
+            index += 7;
+          }
+        }
+
+        for (; index + 1 < values.length; index += 2) {
+          shop.cart.push({
+            productId: values[index],
+            quantity: Number(values[index + 1])
+          });
+        }
+        return shop;
+      }
+
+      function saveTab() {
+        let productCount = -1;
+        if (shop.products !== null) {
+          productCount = shop.products.length;
+        }
+
+        const values = ["goodform-tab", shop.email, productCount];
+        for (let index = 0; index < productCount; index++) {
+          const product = shop.products[index];
+          values.push(product.id, product.name, product.category, product.color);
+          values.push(product.price, product.stock, product.image);
+        }
+
+        for (let index = 0; index < shop.cart.length; index++) {
+          const item = shop.cart[index];
+          values.push(item.productId, item.quantity);
+        }
+        window.name = values.join("\n");
+      }
+
+      const productForm = document.getElementById("product-form");
+      const productRows = document.getElementById("product-rows");
+      const orderRows = document.getElementById("order-rows");
+
+      function adminIsSignedIn() {
+        if (shop.email === "store-admin") {
+          return true;
+        }
+
+        document.getElementById("main-content").hidden = true;
+        alert("Sign in as admin to manage the store.");
+        window.location.replace("login.html");
+        return false;
+      }
+
+      function showInventory(products) {
+        const template = document.getElementById("admin-product-template");
+        productRows.textContent = "";
+        document.getElementById("empty-products").hidden = products.length > 0;
+        document.getElementById("products-table").hidden = products.length === 0;
+
+        for (let index = 0; index < products.length; index++) {
+          const product = products[index];
+          const row = template.content.cloneNode(true);
+          row.querySelector("th").textContent = product.name;
+          row.querySelector(".category").textContent = product.category;
+          row.querySelector(".price").textContent = money(product.price);
+
+          const input = row.querySelector("input");
+          input.value = product.stock;
+          input.setAttribute("aria-label", "Stock for " + product.name);
+          row.querySelector("form").addEventListener("submit", function (event) {
+            event.preventDefault();
+            updateStock(product.id, Number(input.value));
+          });
+          row.querySelector(".delete-product").addEventListener("click", function () {
+            deleteProduct(product.id);
+          });
+
+          productRows.appendChild(row);
+        }
+      }
+
+      function showCustomerOrders() {
+        const template = document.getElementById("admin-order-template");
+        const latestOrder = nextOrderId() - 1;
+        let total = 0;
+        orderRows.textContent = "";
+        document.getElementById("empty-orders").hidden = latestOrder >= 1001;
+        document.getElementById("orders-table").hidden = latestOrder < 1001;
+
+        for (let orderId = latestOrder; orderId >= 1001; orderId--) {
+          const saved = localStorage.getItem("goodform-order-" + orderId);
+          const order = saved.split("\n");
+          const amount = Number(order[6]);
+          const row = template.content.cloneNode(true);
+          row.querySelector("th").textContent = "#GF-" + orderId;
+
+          let customer = order[0];
+          if (order[1] && order[1] !== customer) {
+            customer = order[1] + " (" + customer + ")";
+          }
+          row.querySelector(".customer").textContent = customer;
+
+          const items = [];
+          for (let index = 7; index < order.length; index += 3) {
+            items.push(order[index] + " x " + order[index + 2]);
+          }
+          row.querySelector(".items").textContent = items.join(", ");
+          row.querySelector(".price").textContent = money(amount);
+
+          const status = row.querySelector(".status");
+          status.textContent = order[3];
+          if (order[3] === "Pending") {
+            status.classList.add("status-pending");
+          }
+
+          const button = row.querySelector("button");
+          button.hidden = order[3] === "Delivered";
+          button.addEventListener("click", function () {
+            markDelivered(orderId);
+          });
+          orderRows.appendChild(row);
+          total += amount;
+        }
+        document.getElementById("total-amount").textContent = money(total);
+      }
+
+      function showAdmin() {
+        if (!adminIsSignedIn()) {
+          return;
+        }
+        startCatalog();
+        showInventory(shop.products);
+        showCustomerOrders();
+        document.getElementById("main-content").hidden = false;
+      }
+
+      function addProduct(event) {
+        event.preventDefault();
+        if (!adminIsSignedIn()) {
+          return;
+        }
+
+        const name = document.getElementById("product-name").value.trim();
+        const category = document.getElementById("category").value.trim();
+        const color = document.getElementById("color").value.trim();
+        const price = Math.round(Number(document.getElementById("price").value) * 100);
+        const stock = Number(document.getElementById("stock").value);
+        const image = document.getElementById("product-photo").value.trim();
+
+        if (!name || !category || !color) {
+          alert("Enter a name, category, and color.");
+          return;
+        }
+        if (!Number.isInteger(price) || price < 1 || price > 9999900) {
+          alert("Enter a valid price.");
+          return;
+        }
+        if (!Number.isInteger(stock) || stock < 0 || stock > 9999) {
+          alert("Enter a valid stock quantity.");
+          return;
+        }
+        if (image && !image.startsWith("https://") && !image.startsWith("http://")) {
+          alert("Enter a direct web link for the photo.");
+          return;
+        }
+
+        const products = shop.products;
+        products.push({
+          id: "product-" + Date.now(),
+          name: name,
+          category: category,
+          color: color,
+          price: price,
+          stock: stock,
+          image: image
+        });
+        saveTab();
+        productForm.reset();
+        document.getElementById("add-product-panel").open = false;
+        showInventory(products);
+        alert("Product added.");
+      }
+
+      function updateStock(productId, stock) {
+        if (!adminIsSignedIn()) {
+          return;
+        }
+        const products = shop.products;
+        const product = findProduct(products, productId);
+        if (!product || !Number.isInteger(stock) || stock < 0 || stock > 9999) {
+          alert("Enter a valid stock quantity.");
+          showInventory(products);
+          return;
+        }
+
+        product.stock = stock;
+        saveTab();
+        showInventory(products);
+        alert("Stock updated.");
+      }
+
+      function deleteProduct(productId) {
+        if (!adminIsSignedIn() || !confirm("Delete this product from the store?")) {
+          return;
+        }
+
+        const products = shop.products;
+        for (let index = 0; index < products.length; index++) {
+          if (products[index].id === productId) {
+            products.splice(index, 1);
+            break;
+          }
+        }
+        saveTab();
+        showInventory(products);
+        alert("Product deleted.");
+      }
+
+      function markDelivered(orderId) {
+        if (!adminIsSignedIn()) {
+          return;
+        }
+
+        const key = "goodform-order-" + orderId;
+        const saved = localStorage.getItem(key);
+        if (!saved) {
+          return;
+        }
+        const order = saved.split("\n");
+        order[3] = "Delivered";
+        localStorage.setItem(key, order.join("\n"));
+        showCustomerOrders();
+        alert("Order marked delivered.");
+      }
+
+      productForm.addEventListener("submit", addProduct);
+      function startCatalog() {
+        if (shop.products === null) {
+          shop.products = [
+            {
+              id: "chore-jacket",
+              name: "The Chore Jacket",
+              category: "Outerwear",
+              color: "Washed Olive",
+              price: 8900,
+              stock: 24,
+              image: "https://images.pexels.com/photos/5079261/pexels-photo-5079261.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "everyday-tee",
+              name: "The Everyday Tee",
+              category: "Tops",
+              color: "Natural",
+              price: 3200,
+              stock: 48,
+              image: "https://images.pexels.com/photos/11671964/pexels-photo-11671964.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "straight-jean",
+              name: "The Straight Jean",
+              category: "Denim",
+              color: "Vintage Blue",
+              price: 7800,
+              stock: 16,
+              image: "https://images.pexels.com/photos/20279191/pexels-photo-20279191.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "linen-shirt",
+              name: "The Linen Shirt",
+              category: "Tops",
+              color: "Terracotta",
+              price: 6400,
+              stock: 18,
+              image: "https://images.pexels.com/photos/11671275/pexels-photo-11671275.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            }
+          ];
+          saveTab();
+        }
+      }
+
+      function findProduct(products, productId) {
+        for (let index = 0; index < products.length; index++) {
+          if (products[index].id === productId) {
+            return products[index];
+          }
+        }
+        return null;
+      }
+
+      function nextOrderId() {
+        let orderId = 1001;
+        while (localStorage.getItem("goodform-order-" + orderId)) {
+          orderId++;
+        }
+        return orderId;
+      }
+
+      function money(cents) {
+        return "$" + (cents / 100).toFixed(2);
+      }
+
+      document.getElementById("sign-out").addEventListener("click", function () {
+        shop.email = "";
+        shop.cart = [];
+        saveTab();
+        window.location.replace("index.html");
+      });
+      window.addEventListener("pageshow", function (event) {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+      showAdmin();
+    </script>
   </body>
 </html>

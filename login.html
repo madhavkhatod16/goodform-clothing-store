@@ -1,16 +1,261 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=index.html#login">
-    <title>Sign in | Goodform</title>
+    <title>Sign In | Goodform</title>
     <link rel="stylesheet" href="style.css">
   </head>
+
   <body>
-    <main class="container inner-page">
-      <h1>Sign in</h1>
-      <a class="text-link" href="index.html#login">Open sign in</a>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <p class="announcement">Free shipping on orders over $75</p>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="index.html#new-arrivals">New arrivals</a>
+          <a href="index.html#the-edit">The edit</a>
+          <a href="my_orders.html">Orders</a>
+        </nav>
+        <nav class="account-nav" aria-label="Account and bag">
+          <a href="login.html" aria-current="page">Account</a>
+          <a class="bag-link" href="cart.html"><span class="bag-icon" aria-hidden="true"></span> Bag</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container inner-page account-page" id="main-content">
+      <div class="page-intro">
+        <h1>Your account</h1>
+        <p class="muted">Sign in or create an account to shop.</p>
+      </div>
+
+      <div class="account-tabs" aria-label="Choose an account form">
+        <button class="text-button" id="show-login" type="button" aria-pressed="true">Sign in</button>
+        <button class="text-button" id="show-signup" type="button" aria-pressed="false">Sign up</button>
+      </div>
+
+      <form class="panel stack-form" id="login-form" method="post">
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" autocomplete="username" maxlength="100" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <button class="button" type="submit">Sign in</button>
+      </form>
+
+      <form class="panel stack-form" id="signup-form" method="post" hidden>
+        <label for="new-email">Email address</label>
+        <input id="new-email" name="email" type="email" autocomplete="username" maxlength="100" required>
+
+        <label for="new-password">Password</label>
+        <input id="new-password" name="password" type="password" autocomplete="new-password" minlength="4" maxlength="60" required>
+
+        <button class="button" type="submit">Create account</button>
+      </form>
+
+      <p class="demo-note muted">Use a made-up password for this demo.</p>
     </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="footer-nav" aria-label="Footer links">
+          <a href="index.html#new-arrivals">Shop</a>
+          <a href="login.html">Account</a>
+          <a href="my_orders.html">Orders</a>
+        </nav>
+        <p>&copy; 2026 Goodform</p>
+      </div>
+    </footer>
+
+    <script>
+      const shop = readTab();
+
+      function readTab() {
+        const shop = { email: "", products: null, cart: [] };
+        const values = window.name.split("\n");
+        if (values[0] !== "goodform-tab") {
+          return shop;
+        }
+
+        shop.email = values[1];
+        const productCount = Number(values[2]);
+        let index = 3;
+
+        if (productCount >= 0) {
+          shop.products = [];
+          for (let number = 0; number < productCount; number++) {
+            shop.products.push({
+              id: values[index],
+              name: values[index + 1],
+              category: values[index + 2],
+              color: values[index + 3],
+              price: Number(values[index + 4]),
+              stock: Number(values[index + 5]),
+              image: values[index + 6]
+            });
+            index += 7;
+          }
+        }
+
+        for (; index + 1 < values.length; index += 2) {
+          shop.cart.push({
+            productId: values[index],
+            quantity: Number(values[index + 1])
+          });
+        }
+        return shop;
+      }
+
+      function saveTab() {
+        let productCount = -1;
+        if (shop.products !== null) {
+          productCount = shop.products.length;
+        }
+
+        const values = ["goodform-tab", shop.email, productCount];
+        for (let index = 0; index < productCount; index++) {
+          const product = shop.products[index];
+          values.push(product.id, product.name, product.category, product.color);
+          values.push(product.price, product.stock, product.image);
+        }
+
+        for (let index = 0; index < shop.cart.length; index++) {
+          const item = shop.cart[index];
+          values.push(item.productId, item.quantity);
+        }
+        window.name = values.join("\n");
+      }
+
+      const loginForm = document.getElementById("login-form");
+      const signupForm = document.getElementById("signup-form");
+      const loginTab = document.getElementById("show-login");
+      const signupTab = document.getElementById("show-signup");
+      const adminEmail = "admin@gmail.com";
+
+      function showSignup(show) {
+        loginForm.hidden = show;
+        signupForm.hidden = !show;
+        loginTab.setAttribute("aria-pressed", !show);
+        signupTab.setAttribute("aria-pressed", show);
+      }
+
+      function createAccount(event) {
+        event.preventDefault();
+
+        const email = document.getElementById("new-email").value.trim().toLowerCase();
+        const password = document.getElementById("new-password").value;
+        const accountKey = "goodform-account-" + email;
+
+        if (password.trim().length < 4) {
+          alert("Enter a password with at least four characters.");
+          return;
+        }
+
+        if (email === adminEmail || localStorage.getItem(accountKey) !== null) {
+          alert("This email already has an account.");
+          return;
+        }
+
+        localStorage.setItem(accountKey, password);
+        signupForm.reset();
+        showSignup(false);
+        document.getElementById("email").value = email;
+        document.getElementById("password").value = "";
+        document.getElementById("password").focus();
+        alert("Account created. Please sign in to shop.");
+      }
+
+      function signIn(event) {
+        event.preventDefault();
+
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const password = document.getElementById("password").value;
+
+        if (email === adminEmail && password === "Admin@12345") {
+          shop.email = "store-admin";
+          shop.cart = [];
+          saveTab();
+          alert("Signed in as admin.");
+          window.location.href = "admin.html";
+          return;
+        }
+
+        const savedPassword = localStorage.getItem("goodform-account-" + email);
+        if (savedPassword !== password) {
+          alert("Incorrect email or password.");
+          return;
+        }
+
+        if (shop.email !== email) {
+          shop.cart = [];
+        }
+        shop.email = email;
+        saveTab();
+        alert("Welcome, " + email + "!");
+        window.location.href = "index.html";
+      }
+
+      function copyPreviousOrdersAndAccounts() {
+        const saved = localStorage.getItem("goodform-shop-plain") || localStorage.getItem("goodform-shop-text");
+        if (!saved || saved[0] !== "~") {
+          return;
+        }
+
+        const firstLine = saved.indexOf("\n");
+        if (firstLine < 1) {
+          return;
+        }
+
+        const divider = saved.slice(0, firstLine);
+        const lines = saved.slice(firstLine + 1).split("\n" + divider + "\n");
+        let orderId = "";
+        let order = [];
+
+        for (let index = 0; index < lines.length; index++) {
+          const fields = lines[index].split("|" + divider + "|");
+
+          if (fields[0] === "customer") {
+            const key = "goodform-account-" + fields[2];
+            if (localStorage.getItem(key) === null) {
+              localStorage.setItem(key, fields[3]);
+            }
+          } else if (fields[0] === "order") {
+            savePreviousOrder(orderId, order);
+            orderId = fields[1];
+            order = fields.slice(2);
+          } else if (fields[0] === "item") {
+            order.push(fields[2], fields[3], fields[4]);
+          }
+        }
+
+        savePreviousOrder(orderId, order);
+      }
+
+      function savePreviousOrder(orderId, order) {
+        const key = "goodform-order-" + orderId;
+        if (orderId && localStorage.getItem(key) === null) {
+          localStorage.setItem(key, order.join("\n"));
+        }
+      }
+
+      loginTab.addEventListener("click", function () {
+        showSignup(false);
+      });
+      signupTab.addEventListener("click", function () {
+        showSignup(true);
+      });
+      signupForm.addEventListener("submit", createAccount);
+      loginForm.addEventListener("submit", signIn);
+      window.addEventListener("pageshow", function (event) {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+      copyPreviousOrdersAndAccounts();
+    </script>
   </body>
 </html>
