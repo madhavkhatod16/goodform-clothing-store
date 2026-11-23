@@ -126,6 +126,8 @@
           return;
         }
 
+        loadProducts();
+        removeDeletedCartItems();
         const bill = calculateBill();
         let count = 0;
         cartItems.textContent = "";
@@ -197,6 +199,7 @@
           return;
         }
 
+        loadProducts();
         const cart = shop.cart;
         const product = findProduct(productId);
         if (!product || quantity > product.stock || quantity < 0 || !Number.isInteger(quantity)) {
@@ -225,6 +228,7 @@
           return;
         }
 
+        loadProducts();
         const cart = shop.cart;
         const bill = calculateBill();
         if (cart.length === 0) {
@@ -258,6 +262,9 @@
         const orderKey = "goodform-order-" + orderId;
         const orderText = receipt.join("\n");
         try {
+          if (localStorage.getItem("goodform-products") === null) {
+            saveProducts();
+          }
           localStorage.setItem(orderKey, orderText);
         } catch (error) {
           alert("The order could not be saved. Your bag is still ready to check out.");
@@ -269,6 +276,7 @@
           item.product.stock -= item.quantity;
         }
 
+        saveProducts();
         shop.cart = [];
         saveTab();
         alert("Order placed. Your bill total is " + money(bill.total) + ".");
@@ -310,6 +318,66 @@
         return "$" + (cents / 100).toFixed(2);
       }
 
+      function readProducts(lines, productCount) {
+        const products = [];
+        for (let index = 0; index < productCount; index++) {
+          const product = {
+            id: lines.shift(),
+            name: lines.shift(),
+            category: lines.shift(),
+            color: lines.shift(),
+            price: Number(lines.shift()),
+            stock: Number(lines.shift()),
+            image: lines.shift()
+          };
+          products.push(product);
+        }
+        return products;
+      }
+
+      function loadProducts() {
+        const saved = localStorage.getItem("goodform-products");
+        if (saved === null) {
+          return;
+        }
+
+        shop.products = [];
+        if (saved !== "") {
+          const lines = saved.split("\n");
+          const productCount = lines.length / 7;
+          shop.products = readProducts(lines, productCount);
+        }
+      }
+
+      function saveProducts() {
+        const lines = [];
+        for (let index = 0; index < shop.products.length; index++) {
+          const product = shop.products[index];
+          lines.push(product.id, product.name, product.category, product.color);
+          lines.push(product.price, product.stock, product.image);
+        }
+        localStorage.setItem("goodform-products", lines.join("\n"));
+      }
+
+      function removeDeletedCartItems() {
+        if (shop.products === null) {
+          return;
+        }
+
+        let removed = false;
+        for (let index = shop.cart.length - 1; index >= 0; index--) {
+          const item = shop.cart[index];
+          const product = findProduct(item.productId);
+          if (!product) {
+            shop.cart.splice(index, 1);
+            removed = true;
+          }
+        }
+        if (removed) {
+          saveTab();
+        }
+      }
+
       function readTab() {
         const shop = { email: "", products: null, cart: [] };
         const lines = window.name.split("\n");
@@ -323,20 +391,7 @@
         const productCount = Number(lines.shift());
 
         if (productCount >= 0) {
-          shop.products = [];
-
-          for (let index = 0; index < productCount; index++) {
-            const product = {
-              id: lines.shift(),
-              name: lines.shift(),
-              category: lines.shift(),
-              color: lines.shift(),
-              price: Number(lines.shift()),
-              stock: Number(lines.shift()),
-              image: lines.shift()
-            };
-            shop.products.push(product);
-          }
+          shop.products = readProducts(lines, productCount);
         }
 
         for (let index = 0; index < lines.length; index += 2) {
@@ -352,7 +407,7 @@
 
       function saveTab() {
         let productCount = -1;
-        if (shop.products !== null) {
+        if (shop.products !== null && localStorage.getItem("goodform-products") === null) {
           productCount = shop.products.length;
         }
 
@@ -378,6 +433,11 @@
         shop.cart = [];
         saveTab();
         window.location.replace("index.html");
+      });
+      window.addEventListener("storage", function (event) {
+        if (event.key === "goodform-products") {
+          showCart();
+        }
       });
       window.addEventListener("pageshow", function (event) {
         if (event.persisted) {

@@ -112,7 +112,9 @@
       }
 
       function showProducts() {
+        loadProducts();
         startCatalog();
+        removeDeletedCartItems();
         const products = shop.products;
         const email = shop.email;
 
@@ -168,6 +170,7 @@
           return;
         }
 
+        loadProducts();
         const product = findProduct(shop.products, productId);
         const cart = shop.cart;
         let cartItem = null;
@@ -253,6 +256,56 @@
         return "$" + (cents / 100).toFixed(2);
       }
 
+      function readProducts(lines, productCount) {
+        const products = [];
+        for (let index = 0; index < productCount; index++) {
+          const product = {
+            id: lines.shift(),
+            name: lines.shift(),
+            category: lines.shift(),
+            color: lines.shift(),
+            price: Number(lines.shift()),
+            stock: Number(lines.shift()),
+            image: lines.shift()
+          };
+          products.push(product);
+        }
+        return products;
+      }
+
+      function loadProducts() {
+        const saved = localStorage.getItem("goodform-products");
+        if (saved === null) {
+          return;
+        }
+
+        shop.products = [];
+        if (saved !== "") {
+          const lines = saved.split("\n");
+          const productCount = lines.length / 7;
+          shop.products = readProducts(lines, productCount);
+        }
+      }
+
+      function removeDeletedCartItems() {
+        if (shop.products === null) {
+          return;
+        }
+
+        let removed = false;
+        for (let index = shop.cart.length - 1; index >= 0; index--) {
+          const item = shop.cart[index];
+          const product = findProduct(shop.products, item.productId);
+          if (!product) {
+            shop.cart.splice(index, 1);
+            removed = true;
+          }
+        }
+        if (removed) {
+          saveTab();
+        }
+      }
+
       function readTab() {
         const shop = { email: "", products: null, cart: [] };
         const lines = window.name.split("\n");
@@ -266,20 +319,7 @@
         const productCount = Number(lines.shift());
 
         if (productCount >= 0) {
-          shop.products = [];
-
-          for (let index = 0; index < productCount; index++) {
-            const product = {
-              id: lines.shift(),
-              name: lines.shift(),
-              category: lines.shift(),
-              color: lines.shift(),
-              price: Number(lines.shift()),
-              stock: Number(lines.shift()),
-              image: lines.shift()
-            };
-            shop.products.push(product);
-          }
+          shop.products = readProducts(lines, productCount);
         }
 
         for (let index = 0; index < lines.length; index += 2) {
@@ -295,7 +335,7 @@
 
       function saveTab() {
         let productCount = -1;
-        if (shop.products !== null) {
+        if (shop.products !== null && localStorage.getItem("goodform-products") === null) {
           productCount = shop.products.length;
         }
 
@@ -320,6 +360,11 @@
         shop.cart = [];
         saveTab();
         showProducts();
+      });
+      window.addEventListener("storage", function (event) {
+        if (event.key === "goodform-products") {
+          showProducts();
+        }
       });
       window.addEventListener("pageshow", function (event) {
         if (event.persisted) {
