@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Admin | Goodform</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="account-nav" aria-label="Admin navigation">
+          <a href="index.html">View storefront</a>
+          <button class="text-button" id="sign-out" type="button">Sign out</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container inner-page" id="main-content" hidden>
+      <div class="page-intro">
+        <p class="eyebrow">Store admin</p>
+        <h1>Manage store</h1>
+      </div>
+
+      <section class="admin-section" aria-labelledby="orders-title">
+        <div class="section-heading">
+          <h2 id="orders-title">Orders</h2>
+          <p>Total amount <strong id="total-amount">$0.00</strong></p>
+        </div>
+        <p class="muted" id="empty-orders" hidden>No orders yet.</p>
+        <div class="table-scroll" id="orders-table" role="region" aria-label="Customer orders" tabindex="0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Order</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Items</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Status</th>
+                <th scope="col">Delivery</th>
+              </tr>
+            </thead>
+            <tbody id="order-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="admin-section" aria-labelledby="products-title">
+        <div class="section-heading">
+          <h2 id="products-title">Products</h2>
+        </div>
+
+        <details class="panel add-product" id="add-product-panel">
+          <summary>Add a product</summary>
+          <form class="stack-form product-form" id="product-form" method="post">
+            <div>
+              <label for="product-name">Name</label>
+              <input id="product-name" type="text" maxlength="70" required>
+            </div>
+            <div>
+              <label for="category">Category</label>
+              <input id="category" type="text" maxlength="40" required>
+            </div>
+            <div>
+              <label for="color">Color</label>
+              <input id="color" type="text" maxlength="40" required>
+            </div>
+            <div>
+              <label for="price">Price ($)</label>
+              <input id="price" type="number" min="0.01" max="99999" step="0.01" required>
+            </div>
+            <div>
+              <label for="stock">Stock</label>
+              <input id="stock" type="number" min="0" max="9999" step="1" required>
+            </div>
+            <div class="photo-field">
+              <label for="product-photo">Photo link (optional)</label>
+              <p class="photo-hint muted" id="photo-hint">Paste a direct link to an image online.</p>
+              <input id="product-photo" type="url" maxlength="2048" aria-describedby="photo-hint">
+            </div>
+            <button class="button" type="submit">Add product</button>
+          </form>
+        </details>
+
+        <p class="muted" id="empty-products" hidden>No products in the store.</p>
+        <div class="table-scroll" id="products-table" role="region" aria-label="Product inventory" tabindex="0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Category</th>
+                <th scope="col">Price</th>
+                <th scope="col">Stock</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody id="product-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <p>&copy; 2026 Goodform</p>
+      </div>
+    </footer>
+
+    <template id="admin-product-template">
+      <tr>
+        <th scope="row"></th>
+        <td class="category"></td>
+        <td class="price"></td>
+        <td>
+          <form class="line-actions">
+            <input type="number" min="0" max="9999" step="1" required>
+            <button class="text-button" type="submit">Update</button>
+          </form>
+        </td>
+        <td>
+          <button class="text-button delete-product" type="button">Delete</button>
+        </td>
+      </tr>
+    </template>
+
+    <template id="admin-order-template">
+      <tr>
+        <th scope="row"></th>
+        <td class="customer"></td>
+        <td class="items"></td>
+        <td class="price"></td>
+        <td><span class="status"></span></td>
+        <td>
+          <button class="text-button" type="button">Mark delivered</button>
+        </td>
+      </tr>
+    </template>
+
+    <script>
+      const productForm = document.getElementById("product-form");
+      const productRows = document.getElementById("product-rows");
+      const orderRows = document.getElementById("order-rows");
+
+      function loadAdminShop() {
+        const shop = loadShop();
+        if (shop.email !== "admin@goodform.test") {
+          document.getElementById("main-content").hidden = true;
+          alert("Sign in with the demo admin account to manage the store.");
+          window.location.replace("login.html");
+          return null;
+        }
+        return shop;
+      }
+
+      function money(cents) {
+        return "$" + (cents / 100).toFixed(2);
+      }
+
+      function showAdmin() {
+        const shop = loadAdminShop();
+        if (!shop) {
+          return;
+        }
+
+        if (shop.products === null) {
+          shop.products = [
+            {
+              id: "chore-jacket",
+              name: "The Chore Jacket",
+              category: "Outerwear",
+              color: "Washed Olive",
+              price: 8900,
+              stock: 24,
+              image: "https://images.pexels.com/photos/5079261/pexels-photo-5079261.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "everyday-tee",
+              name: "The Everyday Tee",
+              category: "Tops",
+              color: "Natural",
+              price: 3200,
+              stock: 48,
+              image: "https://images.pexels.com/photos/11671964/pexels-photo-11671964.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "straight-jean",
+              name: "The Straight Jean",
+              category: "Denim",
+              color: "Vintage Blue",
+              price: 7800,
+              stock: 16,
+              image: "https://images.pexels.com/photos/20279191/pexels-photo-20279191.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            },
+            {
+              id: "linen-shirt",
+              name: "The Linen Shirt",
+              category: "Tops",
+              color: "Terracotta",
+              price: 6400,
+              stock: 18,
+              image: "https://images.pexels.com/photos/11671275/pexels-photo-11671275.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=720&h=960"
+            }
+          ];
+          saveShop(shop);
+        }
+
+        showInventory(shop.products);
+        showCustomerOrders(shop.orders);
+        document.getElementById("main-content").hidden = false;
+      }
+
+      function showInventory(products) {
+        const template = document.getElementById("admin-product-template");
+        productRows.textContent = "";
+        document.getElementById("empty-products").hidden = products.length > 0;
+        document.getElementById("products-table").hidden = products.length === 0;
+
+        for (let productIndex = 0; productIndex < products.length; productIndex++) {
+          const product = products[productIndex];
+          const row = template.content.cloneNode(true);
+          row.querySelector("th").textContent = product.name;
+          row.querySelector(".category").textContent = product.category;
+          row.querySelector(".price").textContent = money(product.price);
+
+          const input = row.querySelector("input");
+          input.value = product.stock;
+          input.setAttribute("aria-label", "Stock for " + product.name);
+          row.querySelector("form").addEventListener("submit", function (event) {
+            event.preventDefault();
+            updateStock(product.id, Number(input.value));
+          });
+          row.querySelector(".delete-product").addEventListener("click", function () {
+            deleteProduct(product.id);
+          });
+          productRows.appendChild(row);
+        }
+      }
+
+      function showCustomerOrders(orders) {
+        const template = document.getElementById("admin-order-template");
+        orderRows.textContent = "";
+        document.getElementById("empty-orders").hidden = orders.length > 0;
+        document.getElementById("orders-table").hidden = orders.length === 0;
+        let total = 0;
+
+        for (let index = orders.length - 1; index >= 0; index--) {
+          const order = orders[index];
+          const row = template.content.cloneNode(true);
+          row.querySelector("th").textContent = "#GF-" + order.id;
+          row.querySelector(".customer").textContent = order.customer + " (" + order.email + ")";
+
+          const itemNames = [];
+          for (let itemIndex = 0; itemIndex < order.items.length; itemIndex++) {
+            const item = order.items[itemIndex];
+            itemNames.push(item.name + " × " + item.quantity);
+          }
+          row.querySelector(".items").textContent = itemNames.join(", ");
+          row.querySelector(".price").textContent = money(order.total);
+
+          const status = row.querySelector(".status");
+          status.textContent = order.status;
+          if (order.status === "Pending") {
+            status.classList.add("status-pending");
+          }
+
+          const button = row.querySelector("button");
+          button.hidden = order.status === "Delivered";
+          button.addEventListener("click", function () {
+            markDelivered(order.id);
+          });
+
+          orderRows.appendChild(row);
+          total += order.total;
+        }
+        document.getElementById("total-amount").textContent = money(total);
+      }
+
+      function addProduct(event) {
+        event.preventDefault();
+        const shop = loadAdminShop();
+        if (!shop) {
+          return;
+        }
+
+        const name = document.getElementById("product-name").value.trim();
+        const category = document.getElementById("category").value.trim();
+        const color = document.getElementById("color").value.trim();
+        const price = Math.round(Number(document.getElementById("price").value) * 100);
+        const stock = Number(document.getElementById("stock").value);
+        const image = document.getElementById("product-photo").value.trim();
+
+        if (!name || !category || !color) {
+          alert("Enter a name, category, and color.");
+          return;
+        }
+
+        if (!Number.isInteger(price) || price < 1 || price > 9999900) {
+          alert("Enter a valid price.");
+          return;
+        }
+
+        if (!Number.isInteger(stock) || stock < 0 || stock > 9999) {
+          alert("Enter a valid stock quantity.");
+          return;
+        }
+
+        const product = {
+          id: "product-" + Date.now(),
+          name: name,
+          category: category,
+          color: color,
+          price: price,
+          stock: stock,
+          image: image
+        };
+
+        shop.products.push(product);
+        if (saveChanges(shop, "Product added.")) {
+          productForm.reset();
+          document.getElementById("add-product-panel").open = false;
+        }
+      }
+
+      function saveChanges(shop, message) {
+        try {
+          saveShop(shop);
+        } catch (error) {
+          alert("Could not save the changes. Check your browser storage.");
+          return false;
+        }
+
+        showAdmin();
+        alert(message);
+        return true;
+      }
+
+      function updateStock(productId, stock) {
+        const shop = loadAdminShop();
+        if (!shop) {
+          return;
+        }
+
+        let product = null;
+        for (let index = 0; index < shop.products.length; index++) {
+          if (shop.products[index].id === productId) {
+            product = shop.products[index];
+            break;
+          }
+        }
+
+        if (!product || !Number.isInteger(stock) || stock < 0 || stock > 9999) {
+          alert("Enter a valid stock quantity.");
+          showAdmin();
+          return;
+        }
+
+        product.stock = stock;
+        saveChanges(shop, "Stock updated.");
+      }
+
+      function deleteProduct(productId) {
+        const shop = loadAdminShop();
+        if (!shop || !confirm("Delete this product from the store?")) {
+          return;
+        }
+
+        for (let index = shop.products.length - 1; index >= 0; index--) {
+          if (shop.products[index].id === productId) {
+            shop.products.splice(index, 1);
+          }
+        }
+
+        for (let customerIndex = 0; customerIndex < shop.customers.length; customerIndex++) {
+          const customer = shop.customers[customerIndex];
+          for (let index = customer.cart.length - 1; index >= 0; index--) {
+            if (customer.cart[index].productId === productId) {
+              customer.cart.splice(index, 1);
+            }
+          }
+        }
+
+        saveChanges(shop, "Product deleted.");
+      }
+
+      function markDelivered(orderId) {
+        const shop = loadAdminShop();
+        if (!shop) {
+          return;
+        }
+
+        for (let orderIndex = 0; orderIndex < shop.orders.length; orderIndex++) {
+          const order = shop.orders[orderIndex];
+          if (order.id === orderId && order.status !== "Delivered") {
+            order.status = "Delivered";
+            saveChanges(shop, "Order marked delivered.");
+            return;
+          }
+        }
+      }
+
+      productForm.addEventListener("submit", addProduct);
+
+      document.getElementById("sign-out").addEventListener("click", function () {
+        const shop = loadAdminShop();
+        if (!shop) {
+          return;
+        }
+
+        shop.email = "";
+        saveShop(shop);
+        window.location.replace("index.html");
+      });
+
+      window.addEventListener("pageshow", function (event) {
+        if (event.persisted) {
+          showAdmin();
+        }
+      });
+
+      function getShopStorageKey() {
+        const plainSave = localStorage.getItem("goodform-shop-plain");
+        if (plainSave) {
+          return "goodform-shop-plain";
+        }
+
+        const saved = localStorage.getItem("goodform-shop-text");
+        if (saved && saved.startsWith("shop|")) {
+          return "goodform-shop-plain";
+        }
+
+        return "goodform-shop-text";
+      }
+
+      function loadShop() {
+        const shop = { products: null, customers: [], orders: [], email: "" };
+        const saved = localStorage.getItem(getShopStorageKey());
+        if (!saved) {
+          return shop;
+        }
+
+        const previousFormat = saved.startsWith("plain-shop|");
+        let text = saved;
+        let rowSeparator = "\n";
+        let fieldSeparator = "|";
+
+        if (!previousFormat) {
+          const firstLineEnd = saved.indexOf("\n");
+          if (!saved.startsWith("~") || firstLineEnd < 1) {
+            return shop;
+          }
+
+          const divider = saved.slice(0, firstLineEnd);
+          text = saved.slice(firstLineEnd + 1);
+          rowSeparator = "\n" + divider + "\n";
+          fieldSeparator = "|" + divider + "|";
+        }
+
+        let customer;
+        let order;
+
+        const lines = text.split(rowSeparator);
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const fields = lines[lineIndex].split(fieldSeparator);
+          if (previousFormat) {
+            for (let fieldIndex = 1; fieldIndex < fields.length; fieldIndex++) {
+              let field = fields[fieldIndex];
+              field = field.split("%7C").join("|");
+              field = field.split("%0D").join("\r");
+              field = field.split("%0A").join("\n");
+              fields[fieldIndex] = field.split("%25").join("%");
+            }
+          }
+
+          const type = fields[0];
+
+          if (type === "plain-shop") {
+            shop.email = fields[1];
+            if (fields[2] === "true") {
+              shop.products = [];
+            }
+          } else if (type === "product") {
+            shop.products.push({
+              id: fields[1],
+              name: fields[2],
+              category: fields[3],
+              color: fields[4],
+              price: Number(fields[5]),
+              stock: Number(fields[6]),
+              image: fields[7]
+            });
+          } else if (type === "customer") {
+            customer = {
+              name: fields[1],
+              email: fields[2],
+              password: fields[3],
+              cart: []
+            };
+            shop.customers.push(customer);
+          } else if (type === "cart") {
+            customer.cart.push({ productId: fields[1], quantity: Number(fields[2]) });
+          } else if (type === "order") {
+            order = {
+              id: Number(fields[1]),
+              email: fields[2],
+              customer: fields[3],
+              date: fields[4],
+              status: fields[5],
+              subtotal: Number(fields[6]),
+              shipping: Number(fields[7]),
+              total: Number(fields[8]),
+              items: []
+            };
+            shop.orders.push(order);
+          } else if (type === "item") {
+            order.items.push({
+              productId: fields[1],
+              name: fields[2],
+              price: Number(fields[3]),
+              quantity: Number(fields[4])
+            });
+          }
+        }
+
+        return shop;
+      }
+
+      function saveShop(shop) {
+        const rows = [["plain-shop", shop.email, shop.products !== null]];
+
+        if (shop.products !== null) {
+          for (let productIndex = 0; productIndex < shop.products.length; productIndex++) {
+            const product = shop.products[productIndex];
+            rows.push([
+              "product",
+              product.id,
+              product.name,
+              product.category,
+              product.color,
+              product.price,
+              product.stock,
+              product.image
+            ]);
+          }
+        }
+
+        for (let customerIndex = 0; customerIndex < shop.customers.length; customerIndex++) {
+          const customer = shop.customers[customerIndex];
+          rows.push(["customer", customer.name, customer.email, customer.password]);
+          for (let itemIndex = 0; itemIndex < customer.cart.length; itemIndex++) {
+            const item = customer.cart[itemIndex];
+            rows.push(["cart", item.productId, item.quantity]);
+          }
+        }
+
+        for (let orderIndex = 0; orderIndex < shop.orders.length; orderIndex++) {
+          const order = shop.orders[orderIndex];
+          rows.push([
+            "order",
+            order.id,
+            order.email,
+            order.customer,
+            order.date,
+            order.status,
+            order.subtotal,
+            order.shipping,
+            order.total
+          ]);
+          for (let itemIndex = 0; itemIndex < order.items.length; itemIndex++) {
+            const item = order.items[itemIndex];
+            rows.push(["item", item.productId, item.name, item.price, item.quantity]);
+          }
+        }
+
+        const values = rows.join("\n");
+        let divider = "~";
+        while (values.includes(divider)) {
+          divider += "~";
+        }
+
+        const fieldSeparator = "|" + divider + "|";
+        const rowSeparator = "\n" + divider + "\n";
+        const lines = [];
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          lines.push(rows[rowIndex].join(fieldSeparator));
+        }
+
+        const saved = divider + "\n" + lines.join(rowSeparator);
+        localStorage.setItem(getShopStorageKey(), saved);
+      }
+
+      showAdmin();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In | Goodform</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <p class="announcement">Free shipping on orders over $75</p>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="index.html#new-arrivals">New arrivals</a>
+          <a href="index.html#the-edit">The edit</a>
+          <a href="my_orders.html">Orders</a>
+        </nav>
+        <nav class="account-nav" aria-label="Account and bag">
+          <a href="login.html" aria-current="page">Account</a>
+          <a class="bag-link" href="cart.html"><span class="bag-icon" aria-hidden="true"></span> Bag</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container inner-page account-page" id="main-content">
+      <div class="page-intro">
+        <h1>Your account</h1>
+        <p class="muted">Sign in or create an account to shop.</p>
+      </div>
+
+      <div class="account-tabs" aria-label="Choose an account form">
+        <button class="text-button" id="show-login" type="button" aria-pressed="true">Sign in</button>
+        <button class="text-button" id="show-signup" type="button" aria-pressed="false">Sign up</button>
+      </div>
+
+      <form class="panel stack-form" id="login-form" method="post">
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" autocomplete="username" maxlength="100" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <button class="button" type="submit">Sign in</button>
+      </form>
+
+      <form class="panel stack-form" id="signup-form" method="post" hidden>
+        <label for="new-name">Name</label>
+        <input id="new-name" name="name" type="text" autocomplete="name" maxlength="50" required>
+
+        <label for="new-email">Email address</label>
+        <input id="new-email" name="email" type="email" autocomplete="username" maxlength="100" required>
+
+        <label for="new-password">Password</label>
+        <input id="new-password" name="password" type="password" autocomplete="new-password" minlength="4" maxlength="60" required>
+
+        <button class="button" type="submit">Create account</button>
+      </form>
+
+      <p class="demo-note muted">Use a made-up password for this demo.</p>
+      <p class="demo-note muted">Sign in as demo admin with <strong>admin@goodform.test</strong> / <strong>admin123</strong>.</p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
+        <nav class="footer-nav" aria-label="Footer links">
+          <a href="index.html#new-arrivals">Shop</a>
+          <a href="login.html">Account</a>
+          <a href="my_orders.html">Orders</a>
+        </nav>
+        <p>&copy; 2026 Goodform</p>
+      </div>
+    </footer>
+
+    <script>
+      const loginForm = document.getElementById("login-form");
+      const signupForm = document.getElementById("signup-form");
+      const loginTab = document.getElementById("show-login");
+      const signupTab = document.getElementById("show-signup");
+      const adminEmail = "admin@goodform.test";
+
+      function showSignup(show) {
+        loginForm.hidden = show;
+        signupForm.hidden = !show;
+        loginTab.setAttribute("aria-pressed", !show);
+        signupTab.setAttribute("aria-pressed", show);
+      }
+
+      function createAccount(event) {
+        event.preventDefault();
+        const shop = loadShop();
+        const name = document.getElementById("new-name").value.trim();
+        const email = document.getElementById("new-email").value.trim().toLowerCase();
+        const password = document.getElementById("new-password").value;
+
+        if (!name || password.trim().length < 4) {
+          alert("Enter your name and a password with at least four characters.");
+          return;
+        }
+
+        let emailTaken = email === adminEmail;
+        for (let customerIndex = 0; customerIndex < shop.customers.length; customerIndex++) {
+          const customer = shop.customers[customerIndex];
+          if (customer.email === email) {
+            emailTaken = true;
+            break;
+          }
+        }
+
+        if (emailTaken) {
+          alert("This email already has an account.");
+          return;
+        }
+
+        shop.customers.push({ name: name, email: email, password: password, cart: [] });
+        saveShop(shop);
+        signupForm.reset();
+        showSignup(false);
+        document.getElementById("email").value = email;
+        document.getElementById("password").value = "";
+        alert("Account created. Please sign in to shop.");
+        document.getElementById("password").focus();
+      }
+
+      function signIn(event) {
+        event.preventDefault();
+        const shop = loadShop();
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const password = document.getElementById("password").value;
+        const isAdmin = email === adminEmail && password === "admin123";
+        let customer;
+        for (let accountIndex = 0; accountIndex < shop.customers.length; accountIndex++) {
+          const account = shop.customers[accountIndex];
+          if (account.email === email && account.password === password) {
+            customer = account;
+            break;
+          }
+        }
+
+        if (!isAdmin && !customer) {
+          alert("Incorrect email or password.");
+          return;
+        }
+
+        shop.email = email;
+        saveShop(shop);
+
+        if (isAdmin) {
+          alert("Signed in as admin.");
+          window.location.href = "admin.html";
+        } else {
+          alert("Welcome, " + customer.name + "!");
+          window.location.href = "index.html";
+        }
+      }
+
+      loginTab.addEventListener("click", function () {
+        showSignup(false);
+      });
+
+      signupTab.addEventListener("click", function () {
+        showSignup(true);
+      });
+
+      signupForm.addEventListener("submit", createAccount);
+      loginForm.addEventListener("submit", signIn);
+
+      function getShopStorageKey() {
+        const plainSave = localStorage.getItem("goodform-shop-plain");
+        if (plainSave) {
+          return "goodform-shop-plain";
+        }
+
+        const saved = localStorage.getItem("goodform-shop-text");
+        if (saved && saved.startsWith("shop|")) {
+          return "goodform-shop-plain";
+        }
+
+        return "goodform-shop-text";
+      }
+
+      function loadShop() {
+        const shop = { products: null, customers: [], orders: [], email: "" };
+        const saved = localStorage.getItem(getShopStorageKey());
+        if (!saved) {
+          return shop;
+        }
+
+        const previousFormat = saved.startsWith("plain-shop|");
+        let text = saved;
+        let rowSeparator = "\n";
+        let fieldSeparator = "|";
+
+        if (!previousFormat) {
+          const firstLineEnd = saved.indexOf("\n");
+          if (!saved.startsWith("~") || firstLineEnd < 1) {
+            return shop;
+          }
+
+          const divider = saved.slice(0, firstLineEnd);
+          text = saved.slice(firstLineEnd + 1);
+          rowSeparator = "\n" + divider + "\n";
+          fieldSeparator = "|" + divider + "|";
+        }
+
+        let customer;
+        let order;
+
+        const lines = text.split(rowSeparator);
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const fields = lines[lineIndex].split(fieldSeparator);
+          if (previousFormat) {
+            for (let fieldIndex = 1; fieldIndex < fields.length; fieldIndex++) {
+              let field = fields[fieldIndex];
+              field = field.split("%7C").join("|");
+              field = field.split("%0D").join("\r");
+              field = field.split("%0A").join("\n");
+              fields[fieldIndex] = field.split("%25").join("%");
+            }
+          }
+
+          const type = fields[0];
+
+          if (type === "plain-shop") {
+            shop.email = fields[1];
+            if (fields[2] === "true") {
+              shop.products = [];
+            }
+          } else if (type === "product") {
+            shop.products.push({
+              id: fields[1],
+              name: fields[2],
+              category: fields[3],
+              color: fields[4],
+              price: Number(fields[5]),
+              stock: Number(fields[6]),
+              image: fields[7]
+            });
+          } else if (type === "customer") {
+            customer = {
+              name: fields[1],
+              email: fields[2],
+              password: fields[3],
+              cart: []
+            };
+            shop.customers.push(customer);
+          } else if (type === "cart") {
+            customer.cart.push({ productId: fields[1], quantity: Number(fields[2]) });
+          } else if (type === "order") {
+            order = {
+              id: Number(fields[1]),
+              email: fields[2],
+              customer: fields[3],
+              date: fields[4],
+              status: fields[5],
+              subtotal: Number(fields[6]),
+              shipping: Number(fields[7]),
+              total: Number(fields[8]),
+              items: []
+            };
+            shop.orders.push(order);
+          } else if (type === "item") {
+            order.items.push({
+              productId: fields[1],
+              name: fields[2],
+              price: Number(fields[3]),
+              quantity: Number(fields[4])
+            });
+          }
+        }
+
+        return shop;
+      }
+
+      function saveShop(shop) {
+        const rows = [["plain-shop", shop.email, shop.products !== null]];
+
+        if (shop.products !== null) {
+          for (let productIndex = 0; productIndex < shop.products.length; productIndex++) {
+            const product = shop.products[productIndex];
+            rows.push([
+              "product",
+              product.id,
+              product.name,
+              product.category,
+              product.color,
+              product.price,
+              product.stock,
+              product.image
+            ]);
+          }
+        }
+
+        for (let customerIndex = 0; customerIndex < shop.customers.length; customerIndex++) {
+          const customer = shop.customers[customerIndex];
+          rows.push(["customer", customer.name, customer.email, customer.password]);
+          for (let itemIndex = 0; itemIndex < customer.cart.length; itemIndex++) {
+            const item = customer.cart[itemIndex];
+            rows.push(["cart", item.productId, item.quantity]);
+          }
+        }
+
+        for (let orderIndex = 0; orderIndex < shop.orders.length; orderIndex++) {
+          const order = shop.orders[orderIndex];
+          rows.push([
+            "order",
+            order.id,
+            order.email,
+            order.customer,
+            order.date,
+            order.status,
+            order.subtotal,
+            order.shipping,
+            order.total
+          ]);
+          for (let itemIndex = 0; itemIndex < order.items.length; itemIndex++) {
+            const item = order.items[itemIndex];
+            rows.push(["item", item.productId, item.name, item.price, item.quantity]);
+          }
+        }
+
+        const values = rows.join("\n");
+        let divider = "~";
+        while (values.includes(divider)) {
+          divider += "~";
+        }
+
+        const fieldSeparator = "|" + divider + "|";
+        const rowSeparator = "\n" + divider + "\n";
+        const lines = [];
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          lines.push(rows[rowIndex].join(fieldSeparator));
+        }
+
+        const saved = divider + "\n" + lines.join(rowSeparator);
+        localStorage.setItem(getShopStorageKey(), saved);
+      }
+    </script>
+  </body>
+</html>
