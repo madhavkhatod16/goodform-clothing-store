@@ -250,19 +250,32 @@
           }
         }
 
-        const date = new Date().toISOString();
-        const receipt = [email, "", date, "Pending", bill.subtotal, bill.shipping, bill.total];
+        const order = {
+          email: email,
+          customerName: "",
+          date: new Date().toISOString(),
+          status: "Pending",
+          subtotal: bill.subtotal,
+          shipping: bill.shipping,
+          total: bill.total,
+          items: []
+        };
 
         for (let index = 0; index < bill.items.length; index++) {
           const item = bill.items[index];
-          receipt.push(item.product.name, item.product.price, item.quantity);
+          order.items.push({
+            name: item.product.name,
+            price: item.product.price,
+            quantity: item.quantity
+          });
         }
 
         const orderId = nextOrderId();
         const orderKey = "goodform-order-" + orderId;
-        const orderText = receipt.join("\n");
+        const orderText = JSON.stringify(order);
         try {
-          if (localStorage.getItem("goodform-products") === null) {
+          const savedProducts = localStorage.getItem("goodform-products");
+          if (!savedProducts || !savedProducts.startsWith("[")) {
             saveProducts();
           }
           localStorage.setItem(orderKey, orderText);
@@ -341,6 +354,11 @@
           return;
         }
 
+        if (saved.startsWith("[")) {
+          shop.products = JSON.parse(saved);
+          return;
+        }
+
         shop.products = [];
         if (saved !== "") {
           const lines = saved.split("\n");
@@ -350,13 +368,8 @@
       }
 
       function saveProducts() {
-        const lines = [];
-        for (let index = 0; index < shop.products.length; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-        localStorage.setItem("goodform-products", lines.join("\n"));
+        const saved = JSON.stringify(shop.products);
+        localStorage.setItem("goodform-products", saved);
       }
 
       function removeDeletedCartItems() {
@@ -387,6 +400,10 @@
           return shop;
         }
 
+        if (lines.length === 1 && lines[0].startsWith("{")) {
+          return JSON.parse(lines[0]);
+        }
+
         shop.email = lines.shift();
         const productCount = Number(lines.shift());
 
@@ -406,25 +423,17 @@
       }
 
       function saveTab() {
-        let productCount = -1;
-        if (shop.products !== null && localStorage.getItem("goodform-products") === null) {
-          productCount = shop.products.length;
+        const tab = {
+          email: shop.email,
+          products: null,
+          cart: shop.cart
+        };
+
+        if (localStorage.getItem("goodform-products") === null) {
+          tab.products = shop.products;
         }
 
-        const lines = ["goodform-tab", shop.email, productCount];
-
-        for (let index = 0; index < productCount; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-
-        for (let index = 0; index < shop.cart.length; index++) {
-          const item = shop.cart[index];
-          lines.push(item.productId, item.quantity);
-        }
-
-        window.name = lines.join("\n");
+        window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
       document.getElementById("checkout-button").addEventListener("click", placeOrder);

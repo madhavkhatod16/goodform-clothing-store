@@ -114,7 +114,7 @@
 
         for (let orderId = nextOrderId() - 1; orderId >= 1001; orderId--) {
           const order = readOrder(orderId);
-          if (order.email !== email) {
+          if (order === null || order.email !== email) {
             continue;
           }
 
@@ -167,6 +167,13 @@
       function readOrder(orderId) {
         const key = "goodform-order-" + orderId;
         const saved = localStorage.getItem(key);
+        if (saved === null) {
+          return null;
+        }
+        if (saved.startsWith("{")) {
+          return JSON.parse(saved);
+        }
+
         const lines = saved.split("\n");
 
         const order = {
@@ -213,6 +220,10 @@
           return shop;
         }
 
+        if (lines.length === 1 && lines[0].startsWith("{")) {
+          return JSON.parse(lines[0]);
+        }
+
         shop.email = lines.shift();
         const productCount = Number(lines.shift());
 
@@ -245,25 +256,17 @@
       }
 
       function saveTab() {
-        let productCount = -1;
-        if (shop.products !== null) {
-          productCount = shop.products.length;
+        const tab = {
+          email: shop.email,
+          products: null,
+          cart: shop.cart
+        };
+
+        if (localStorage.getItem("goodform-products") === null) {
+          tab.products = shop.products;
         }
 
-        const lines = ["goodform-tab", shop.email, productCount];
-
-        for (let index = 0; index < productCount; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-
-        for (let index = 0; index < shop.cart.length; index++) {
-          const item = shop.cart[index];
-          lines.push(item.productId, item.quantity);
-        }
-
-        window.name = lines.join("\n");
+        window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
       document.getElementById("sign-out").addEventListener("click", function () {

@@ -196,6 +196,9 @@
 
         for (let orderId = latestOrder; orderId >= 1001; orderId--) {
           const order = readOrder(orderId);
+          if (order === null) {
+            continue;
+          }
           const row = template.content.cloneNode(true);
           row.querySelector("th").textContent = "#GF-" + orderId;
 
@@ -334,14 +337,14 @@
           return;
         }
 
-        const key = "goodform-order-" + orderId;
-        const saved = localStorage.getItem(key);
-        if (!saved) {
+        const order = readOrder(orderId);
+        if (order === null) {
           return;
         }
-        const order = saved.split("\n");
-        order[3] = "Delivered";
-        localStorage.setItem(key, order.join("\n"));
+
+        order.status = "Delivered";
+        const key = "goodform-order-" + orderId;
+        localStorage.setItem(key, JSON.stringify(order));
         showCustomerOrders();
         alert("Order marked delivered.");
       }
@@ -369,6 +372,11 @@
           return;
         }
 
+        if (saved.startsWith("[")) {
+          shop.products = JSON.parse(saved);
+          return;
+        }
+
         shop.products = [];
         if (saved !== "") {
           const lines = saved.split("\n");
@@ -378,13 +386,8 @@
       }
 
       function saveProducts() {
-        const lines = [];
-        for (let index = 0; index < shop.products.length; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-        localStorage.setItem("goodform-products", lines.join("\n"));
+        const saved = JSON.stringify(shop.products);
+        localStorage.setItem("goodform-products", saved);
       }
 
       function readTab() {
@@ -394,6 +397,10 @@
 
         if (tabName !== "goodform-tab") {
           return shop;
+        }
+
+        if (lines.length === 1 && lines[0].startsWith("{")) {
+          return JSON.parse(lines[0]);
         }
 
         shop.email = lines.shift();
@@ -415,25 +422,17 @@
       }
 
       function saveTab() {
-        let productCount = -1;
-        if (shop.products !== null && localStorage.getItem("goodform-products") === null) {
-          productCount = shop.products.length;
+        const tab = {
+          email: shop.email,
+          products: null,
+          cart: shop.cart
+        };
+
+        if (localStorage.getItem("goodform-products") === null) {
+          tab.products = shop.products;
         }
 
-        const lines = ["goodform-tab", shop.email, productCount];
-
-        for (let index = 0; index < productCount; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-
-        for (let index = 0; index < shop.cart.length; index++) {
-          const item = shop.cart[index];
-          lines.push(item.productId, item.quantity);
-        }
-
-        window.name = lines.join("\n");
+        window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
       productForm.addEventListener("submit", addProduct);
@@ -493,6 +492,13 @@
       function readOrder(orderId) {
         const key = "goodform-order-" + orderId;
         const saved = localStorage.getItem(key);
+        if (saved === null) {
+          return null;
+        }
+        if (saved.startsWith("{")) {
+          return JSON.parse(saved);
+        }
+
         const lines = saved.split("\n");
 
         const order = {

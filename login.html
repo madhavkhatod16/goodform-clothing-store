@@ -92,19 +92,23 @@
 
         const email = document.getElementById("new-email").value.trim().toLowerCase();
         const password = document.getElementById("new-password").value;
-        const accountKey = "goodform-account-" + email;
+        const accountKey = "goodform-login-" + email;
+        const oldAccountKey = "goodform-account-" + email;
 
         if (password.trim().length < 4) {
           alert("Enter a password with at least four characters.");
           return;
         }
 
-        if (email === adminEmail || localStorage.getItem(accountKey) !== null) {
+        const accountExists = localStorage.getItem(accountKey) !== null;
+        const oldAccountExists = localStorage.getItem(oldAccountKey) !== null;
+        if (email === adminEmail || accountExists || oldAccountExists) {
           alert("This email already has an account.");
           return;
         }
 
-        localStorage.setItem(accountKey, password);
+        const account = { password: password };
+        localStorage.setItem(accountKey, JSON.stringify(account));
         signupForm.reset();
         showSignup(false);
         document.getElementById("email").value = email;
@@ -128,7 +132,12 @@
           return;
         }
 
-        const savedPassword = localStorage.getItem("goodform-account-" + email);
+        const saved = localStorage.getItem("goodform-login-" + email);
+        let savedPassword = localStorage.getItem("goodform-account-" + email);
+        if (saved !== null) {
+          const account = JSON.parse(saved);
+          savedPassword = account.password;
+        }
         if (savedPassword !== password) {
           alert("Incorrect email or password.");
           return;
@@ -201,6 +210,10 @@
           return shop;
         }
 
+        if (lines.length === 1 && lines[0].startsWith("{")) {
+          return JSON.parse(lines[0]);
+        }
+
         shop.email = lines.shift();
         const productCount = Number(lines.shift());
 
@@ -233,25 +246,17 @@
       }
 
       function saveTab() {
-        let productCount = -1;
-        if (shop.products !== null) {
-          productCount = shop.products.length;
+        const tab = {
+          email: shop.email,
+          products: null,
+          cart: shop.cart
+        };
+
+        if (localStorage.getItem("goodform-products") === null) {
+          tab.products = shop.products;
         }
 
-        const lines = ["goodform-tab", shop.email, productCount];
-
-        for (let index = 0; index < productCount; index++) {
-          const product = shop.products[index];
-          lines.push(product.id, product.name, product.category, product.color);
-          lines.push(product.price, product.stock, product.image);
-        }
-
-        for (let index = 0; index < shop.cart.length; index++) {
-          const item = shop.cart[index];
-          lines.push(item.productId, item.quantity);
-        }
-
-        window.name = lines.join("\n");
+        window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
       loginTab.addEventListener("click", function () {
