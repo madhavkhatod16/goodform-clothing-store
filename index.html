@@ -114,7 +114,7 @@
         </div>
         <p class="product-color"></p>
         <form class="product-options">
-          <div class="product-choices">
+          <div class="product-choices" hidden>
             <label>
               Size
               <select class="product-size">
@@ -135,7 +135,7 @@
             </div>
           </div>
           <p class="product-message muted" role="status" hidden></p>
-          <button class="button product-button" type="submit">Add to cart</button>
+          <button class="button product-button" type="submit" aria-expanded="false">Add to cart</button>
         </form>
       </article>
     </template>
@@ -230,6 +230,7 @@
 
       function setUpProductForm(card, product) {
         const form = card.querySelector(".product-options");
+        const choices = card.querySelector(".product-choices");
         const size = card.querySelector(".product-size");
         const quantityOutput = card.querySelector(".product-quantity");
         const minusButton = card.querySelector(".quantity-minus");
@@ -239,6 +240,7 @@
         let quantity = 1;
 
         if (pendingProduct && pendingProduct.id === product.id) {
+          choices.hidden = false;
           size.value = pendingProduct.size;
           quantity = pendingProduct.quantity;
         }
@@ -253,6 +255,7 @@
           plusButton.disabled = quantity >= available;
           size.disabled = available < 1;
           addButton.disabled = available < 1;
+          addButton.setAttribute("aria-expanded", !choices.hidden);
 
           if (product.stock === 0) {
             addButton.textContent = "Out of stock";
@@ -276,6 +279,12 @@
         });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
+          if (choices.hidden) {
+            choices.hidden = false;
+            addButton.setAttribute("aria-expanded", "true");
+            size.focus();
+            return;
+          }
           if (!customerIsSignedIn()) {
             pendingProduct = { id: product.id, size: size.value, quantity: quantity };
             openShopAccount();
@@ -288,7 +297,9 @@
             return;
           }
           if (addToBag(product.id, size.value, quantity)) {
+            choices.hidden = true;
             message.hidden = true;
+            size.value = "";
             quantity = 1;
             showQuantity();
           } else {
