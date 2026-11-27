@@ -9,7 +9,7 @@
 
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    <p class="announcement">Free shipping on orders over $75</p>
+    <p class="announcement">Free shipping on orders over ₹75</p>
     <header class="site-header">
       <div class="container header-inner">
         <a class="wordmark" href="index.html" aria-label="Goodform home">goodform<span>.</span></a>
@@ -72,7 +72,7 @@
     </footer>
 
     <script>
-      const shop = readTab();
+      let shop = readTab();
 
       const loginForm = document.getElementById("login-form");
       const signupForm = document.getElementById("signup-form");
@@ -267,10 +267,8 @@
       });
       signupForm.addEventListener("submit", createAccount);
       loginForm.addEventListener("submit", signIn);
-      window.addEventListener("pageshow", function (event) {
-        if (event.persisted) {
-          window.location.reload();
-        }
+      window.addEventListener("pageshow", function () {
+        shop = readTab();
       });
       copyPreviousOrdersAndAccounts();
     </script>

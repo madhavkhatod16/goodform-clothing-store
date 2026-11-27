@@ -10,7 +10,7 @@
 
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    <p class="announcement">Free shipping on orders over $75</p>
+    <p class="announcement">Free shipping on orders over ₹75</p>
 
     <header class="site-header">
       <div class="container header-inner">
@@ -80,6 +80,50 @@
       </div>
     </footer>
 
+    <div class="panel shop-popover" id="product-options" popover role="dialog" aria-labelledby="options-product">
+      <div class="popover-heading">
+        <h2 id="options-product"></h2>
+        <button class="text-button" type="button" popovertarget="product-options" popovertargetaction="hide">Close</button>
+      </div>
+      <p class="price" id="options-price"></p>
+      <form class="stack-form" id="product-options-form">
+        <label for="product-size">Size</label>
+        <select id="product-size" required>
+          <option value="">Choose a size</option>
+          <option value="S">S</option>
+          <option value="M">M</option>
+          <option value="L">L</option>
+          <option value="XL">XL</option>
+        </select>
+        <p id="quantity-label">Quantity</p>
+        <div class="quantity-picker" role="group" aria-labelledby="quantity-label">
+          <button type="button" id="quantity-minus" aria-label="Decrease quantity">−</button>
+          <output id="product-quantity" aria-live="polite">1</output>
+          <button type="button" id="quantity-plus" aria-label="Increase quantity">+</button>
+        </div>
+        <button class="button" type="submit">Add to cart</button>
+      </form>
+    </div>
+
+    <div class="panel shop-popover" id="shop-account" popover role="dialog" aria-labelledby="shop-account-title">
+      <div class="popover-heading">
+        <h2 id="shop-account-title">Sign in to shop</h2>
+        <button class="text-button" type="button" popovertarget="shop-account" popovertargetaction="hide">Close</button>
+      </div>
+      <div class="account-tabs">
+        <button class="text-button" type="button" id="shop-show-sign-in" aria-pressed="true">Sign in</button>
+        <button class="text-button" type="button" id="shop-show-sign-up" aria-pressed="false">Sign up</button>
+      </div>
+      <form class="stack-form" id="shop-account-form" method="post">
+        <label for="shop-email">Email address</label>
+        <input id="shop-email" type="email" autocomplete="username" maxlength="100" required>
+        <label for="shop-password">Password</label>
+        <input id="shop-password" type="password" autocomplete="current-password" maxlength="60" required>
+        <button class="button" id="shop-account-submit" type="submit">Sign in</button>
+      </form>
+      <p class="demo-note muted" id="shop-account-message" role="status"></p>
+    </div>
+
     <template id="product-template">
       <article class="product-card">
         <div class="product-image">
@@ -88,20 +132,31 @@
         </div>
         <div class="product-heading">
           <h3></h3>
-          <p class="price"></p>
+          <div class="product-prices">
+            <del class="original-price" hidden></del>
+            <p class="price"></p>
+          </div>
         </div>
         <p class="product-color"></p>
-        <button class="button product-button" type="button">Add to bag</button>
+        <button class="button product-button" type="button">Add to cart</button>
       </article>
     </template>
 
     <script>
-      const shop = readTab();
+      let shop = readTab();
 
       const productsList = document.getElementById("products");
       const productTemplate = document.getElementById("product-template");
       const signOutButton = document.getElementById("sign-out");
       const accountLink = document.getElementById("account-link");
+      const productOptions = document.getElementById("product-options");
+      const shopAccount = document.getElementById("shop-account");
+      const shopAccountForm = document.getElementById("shop-account-form");
+      const accountMessage = document.getElementById("shop-account-message");
+      let signingUp = false;
+      let selectedProductId = "";
+      let quantity = 1;
+      let quantityLimit = 1;
 
       function showBagCount(cart) {
         let count = 0;
@@ -146,7 +201,13 @@
           }
 
           card.querySelector("h3").textContent = product.name;
-          card.querySelector(".price").textContent = money(product.price);
+          const price = salePrice(product);
+          card.querySelector(".price").textContent = money(price);
+          if (price < product.price) {
+            const originalPrice = card.querySelector(".original-price");
+            originalPrice.textContent = money(product.price);
+            originalPrice.hidden = false;
+          }
           card.querySelector(".product-color").textContent = product.color;
 
           const button = card.querySelector("button");
@@ -155,48 +216,242 @@
             button.textContent = "Out of stock";
           }
           button.addEventListener("click", function () {
-            addToBag(product.id);
+            chooseProduct(product.id);
           });
 
           productsList.appendChild(card);
         }
       }
 
-      function addToBag(productId) {
-        const email = shop.email;
-        if (!email || email === "store-admin") {
-          alert("Please sign in as a customer before shopping.");
-          window.location.href = "login.html";
+      function customerIsSignedIn() {
+        if (!shop.email || shop.email === "store-admin") {
+          return false;
+        }
+        return true;
+      }
+
+      function quantityInBag(productId) {
+        let count = 0;
+        for (let index = 0; index < shop.cart.length; index++) {
+          const item = shop.cart[index];
+          if (item.productId === productId) {
+            count += item.quantity;
+          }
+        }
+        return count;
+      }
+
+      function chooseProduct(productId) {
+        selectedProductId = productId;
+        if (!customerIsSignedIn()) {
+          openShopAccount();
+          return;
+        }
+        showProductOptions();
+      }
+
+      function showProductOptions() {
+        loadProducts();
+        const product = findProduct(shop.products, selectedProductId);
+        if (!product) {
+          alert("This product is no longer available.");
           return;
         }
 
-        loadProducts();
-        const product = findProduct(shop.products, productId);
-        const cart = shop.cart;
-        let cartItem = null;
-        for (let index = 0; index < cart.length; index++) {
-          if (cart[index].productId === productId) {
-            cartItem = cart[index];
-            break;
-          }
-        }
-
-        let quantity = 0;
-        if (cartItem) {
-          quantity = cartItem.quantity;
-        }
-        if (!product || quantity >= product.stock) {
+        quantityLimit = product.stock - quantityInBag(product.id);
+        if (quantityLimit < 1) {
           alert("There is no more stock available for this item.");
           return;
         }
 
+        quantity = 1;
+        document.getElementById("product-size").value = "";
+        document.getElementById("options-product").textContent = product.name;
+        document.getElementById("options-price").textContent = money(salePrice(product));
+        showQuantity();
+        productOptions.showPopover();
+        document.getElementById("product-size").focus();
+      }
+
+      function showQuantity() {
+        document.getElementById("product-quantity").textContent = quantity;
+        document.getElementById("quantity-minus").disabled = quantity <= 1;
+        document.getElementById("quantity-plus").disabled = quantity >= quantityLimit;
+      }
+
+      function changeQuantity(change) {
+        const nextQuantity = quantity + change;
+        if (nextQuantity >= 1 && nextQuantity <= quantityLimit) {
+          quantity = nextQuantity;
+          showQuantity();
+        }
+      }
+
+      function addToBag(event) {
+        event.preventDefault();
+        if (!customerIsSignedIn()) {
+          openShopAccount();
+          return;
+        }
+
+        loadProducts();
+        const product = findProduct(shop.products, selectedProductId);
+        const size = document.getElementById("product-size").value;
+        if (!size) {
+          return;
+        }
+        if (!product || quantity + quantityInBag(selectedProductId) > product.stock) {
+          alert("There is no more stock available for this item.");
+          return;
+        }
+
+        const cart = shop.cart;
+        let cartItem = null;
+        for (let index = 0; index < cart.length; index++) {
+          const item = cart[index];
+          if (item.productId === selectedProductId && item.size === size) {
+            cartItem = item;
+            break;
+          }
+        }
+
         if (cartItem) {
-          cartItem.quantity++;
+          cartItem.quantity += quantity;
         } else {
-          cart.push({ productId: productId, quantity: 1 });
+          cart.push({ productId: selectedProductId, size: size, quantity: quantity });
         }
         saveTab();
         showBagCount(cart);
+        productOptions.hidePopover();
+      }
+
+      function showShopSignUp(signUp) {
+        signingUp = signUp;
+        document.getElementById("shop-show-sign-in").setAttribute("aria-pressed", !signUp);
+        document.getElementById("shop-show-sign-up").setAttribute("aria-pressed", signUp);
+        const submitButton = document.getElementById("shop-account-submit");
+        const title = document.getElementById("shop-account-title");
+        const passwordInput = document.getElementById("shop-password");
+        if (signUp) {
+          title.textContent = "Create an account";
+          submitButton.textContent = "Create account";
+          passwordInput.autocomplete = "new-password";
+        } else {
+          title.textContent = "Sign in to shop";
+          submitButton.textContent = "Sign in";
+          passwordInput.autocomplete = "current-password";
+        }
+        accountMessage.textContent = "";
+      }
+
+      function openShopAccount() {
+        copyPreviousOrdersAndAccounts();
+        showShopSignUp(false);
+        shopAccount.showPopover();
+        document.getElementById("shop-email").focus();
+      }
+
+      function copyPreviousOrdersAndAccounts() {
+        let saved = localStorage.getItem("goodform-shop-plain");
+        if (!saved) {
+          saved = localStorage.getItem("goodform-shop-text");
+        }
+        if (!saved || saved[0] !== "~") {
+          return;
+        }
+
+        const firstLine = saved.indexOf("\n");
+        if (firstLine < 1) {
+          return;
+        }
+
+        const divider = saved.slice(0, firstLine);
+        const lines = saved.slice(firstLine + 1).split("\n" + divider + "\n");
+        let orderId = "";
+        let order = [];
+
+        for (let index = 0; index < lines.length; index++) {
+          const fields = lines[index].split("|" + divider + "|");
+
+          if (fields[0] === "customer") {
+            const key = "goodform-account-" + fields[2];
+            if (localStorage.getItem(key) === null) {
+              localStorage.setItem(key, fields[3]);
+            }
+          } else if (fields[0] === "order") {
+            savePreviousOrder(orderId, order);
+            orderId = fields[1];
+            order = [];
+            for (let field = 2; field < fields.length; field++) {
+              order.push(fields[field]);
+            }
+          } else if (fields[0] === "item") {
+            order.push(fields[2], fields[3], fields[4]);
+          }
+        }
+
+        savePreviousOrder(orderId, order);
+      }
+
+      function savePreviousOrder(orderId, order) {
+        const key = "goodform-order-" + orderId;
+        if (orderId && localStorage.getItem(key) === null) {
+          localStorage.setItem(key, order.join("\n"));
+        }
+      }
+
+      function readShopPassword(email) {
+        const saved = localStorage.getItem("goodform-login-" + email);
+        if (saved !== null) {
+          const account = JSON.parse(saved);
+          return account.password;
+        }
+        return localStorage.getItem("goodform-account-" + email);
+      }
+
+      function finishShopSignIn(email) {
+        if (shop.email !== email) {
+          shop.cart = [];
+        }
+        shop.email = email;
+        saveTab();
+        shopAccountForm.reset();
+        shopAccount.hidePopover();
+        showProducts();
+        if (selectedProductId) {
+          showProductOptions();
+        }
+      }
+
+      function submitShopAccount(event) {
+        event.preventDefault();
+        const email = document.getElementById("shop-email").value.trim().toLowerCase();
+        const password = document.getElementById("shop-password").value;
+        const savedPassword = readShopPassword(email);
+        if (signingUp) {
+          if (email === "admin@gmail.com" || savedPassword !== null) {
+            accountMessage.textContent = "This email already has an account.";
+            return;
+          }
+          if (password.trim().length < 4) {
+            accountMessage.textContent = "Use at least four characters for the password.";
+            return;
+          }
+          const account = { password: password };
+          localStorage.setItem("goodform-login-" + email, JSON.stringify(account));
+        } else if (savedPassword !== password) {
+          accountMessage.textContent = "Incorrect email or password.";
+          return;
+        }
+        finishShopSignIn(email);
+      }
+
+      function salePrice(product) {
+        let discount = 0;
+        if (product.discount) {
+          discount = product.discount;
+        }
+        return Math.round(product.price * (100 - discount) / 100);
       }
 
       function startCatalog() {
@@ -252,8 +507,8 @@
         return null;
       }
 
-      function money(cents) {
-        return "$" + (cents / 100).toFixed(2);
+      function money(paise) {
+        return "₹" + (paise / 100).toFixed(2);
       }
 
       function readProducts(lines, productCount) {
@@ -356,6 +611,41 @@
         window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
+      document.getElementById("product-options-form").addEventListener("submit", addToBag);
+      document.getElementById("quantity-minus").addEventListener("click", function () {
+        changeQuantity(-1);
+      });
+      document.getElementById("quantity-plus").addEventListener("click", function () {
+        changeQuantity(1);
+      });
+      document.getElementById("shop-show-sign-in").addEventListener("click", function () {
+        showShopSignUp(false);
+        document.getElementById("shop-email").focus();
+      });
+      document.getElementById("shop-show-sign-up").addEventListener("click", function () {
+        showShopSignUp(true);
+        document.getElementById("shop-email").focus();
+      });
+      shopAccountForm.addEventListener("submit", submitShopAccount);
+
+      function openAccountForGuest(event) {
+        if (!customerIsSignedIn()) {
+          event.preventDefault();
+          selectedProductId = "";
+          openShopAccount();
+        }
+      }
+
+      const shoppingLinks = document.querySelectorAll('a[href="cart.html"], a[href="my_orders.html"]');
+      for (let index = 0; index < shoppingLinks.length; index++) {
+        shoppingLinks[index].addEventListener("click", openAccountForGuest);
+      }
+      accountLink.addEventListener("click", function (event) {
+        if (shop.email !== "store-admin") {
+          openAccountForGuest(event);
+        }
+      });
+
       signOutButton.addEventListener("click", function () {
         shop.email = "";
         shop.cart = [];
@@ -367,12 +657,15 @@
           showProducts();
         }
       });
-      window.addEventListener("pageshow", function (event) {
-        if (event.persisted) {
-          window.location.reload();
+      function showStorefront() {
+        shop = readTab();
+        showProducts();
+        if (!customerIsSignedIn() && window.location.hash === "#shop-sign-in") {
+          openShopAccount();
         }
-      });
-      showProducts();
+      }
+      window.addEventListener("pageshow", showStorefront);
+      showStorefront();
     </script>
   </body>
 </html>

@@ -452,8 +452,19 @@ button:disabled {
   letter-spacing: normal;
 }
 
-.cart-item .price {
+.cart-item-prices {
   margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.product-prices {
+  text-align: right;
+}
+
+.original-price {
+  color: #595b50;
+  font-size: 0.875rem;
 }
 
 .cart-item-info {
@@ -534,7 +545,7 @@ button:disabled {
   font-weight: bold;
 }
 
-.stack-form input {
+.stack-form input, .stack-form select {
   display: block;
   width: 100%;
   min-height: 46px;
@@ -544,6 +555,57 @@ button:disabled {
   border-radius: 0;
   background-color: #fff;
   color: #262820;
+}
+
+.stack-form select {
+  font: inherit;
+}
+
+.shop-popover {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.popover-heading h2 {
+  font-size: 1.75rem;
+}
+
+.shop-popover .price {
+  margin-bottom: 12px;
+}
+
+.quantity-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 6px 0 12px;
+}
+
+.quantity-picker button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #817d71;
+  background-color: #fff;
+  color: #262820;
+}
+
+.quantity-picker button:disabled {
+  color: #696a61;
+  background-color: #eae5db;
+}
+
+.discount-price {
+  display: block;
 }
 
 .stack-form .button, .cart-summary .button {

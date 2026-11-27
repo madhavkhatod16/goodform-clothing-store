@@ -69,12 +69,16 @@
               <input id="color" type="text" maxlength="40" required>
             </div>
             <div>
-              <label for="price">Price ($)</label>
+              <label for="price">Price (₹)</label>
               <input id="price" type="number" min="0.01" max="99999" step="0.01" required>
             </div>
             <div>
               <label for="stock">Stock</label>
               <input id="stock" type="number" min="0" max="9999" step="1" required>
+            </div>
+            <div>
+              <label for="product-discount">Discount</label>
+              <input id="product-discount" type="text" inputmode="decimal" maxlength="8" placeholder="5%">
             </div>
             <div class="photo-field">
               <label for="product-photo">Photo link (optional)</label>
@@ -94,6 +98,7 @@
                 <th scope="col">Category</th>
                 <th scope="col">Price</th>
                 <th scope="col">Stock</th>
+                <th scope="col">Discount price</th>
                 <th scope="col">Action</th>
               </tr>
             </thead>
@@ -116,9 +121,17 @@
         <td class="category"></td>
         <td class="price"></td>
         <td>
-          <form class="line-actions">
+          <form class="line-actions stock-form">
             <input type="number" min="0" max="9999" step="1" required>
             <button class="text-button" type="submit">Update</button>
+          </form>
+        </td>
+        <td>
+          <del class="original-price" hidden></del>
+          <strong class="discount-price"></strong>
+          <form class="line-actions discount-form">
+            <input type="text" inputmode="decimal" maxlength="8" placeholder="5%">
+            <button class="text-button" type="submit">Apply</button>
           </form>
         </td>
         <td>
@@ -141,7 +154,7 @@
     </template>
 
     <script>
-      const shop = readTab();
+      let shop = readTab();
 
       const productForm = document.getElementById("product-form");
       const productRows = document.getElementById("product-rows");
@@ -171,13 +184,36 @@
           row.querySelector(".category").textContent = product.category;
           row.querySelector(".price").textContent = money(product.price);
 
-          const input = row.querySelector("input");
+          const stockForm = row.querySelector(".stock-form");
+          const input = stockForm.querySelector("input");
           input.value = product.stock;
           input.setAttribute("aria-label", "Stock for " + product.name);
-          row.querySelector("form").addEventListener("submit", function (event) {
+          stockForm.addEventListener("submit", function (event) {
             event.preventDefault();
             updateStock(product.id, Number(input.value));
           });
+
+          const discountForm = row.querySelector(".discount-form");
+          const discountInput = discountForm.querySelector("input");
+          let discount = 0;
+          if (product.discount) {
+            discount = product.discount;
+          }
+          discountInput.value = discount + "%";
+          discountInput.setAttribute("aria-label", "Discount for " + product.name);
+          showDiscountPrice(row, product.price, discount);
+
+          discountInput.addEventListener("input", function () {
+            const nextDiscount = readDiscount(discountInput.value);
+            if (nextDiscount !== null) {
+              showDiscountPrice(row, product.price, nextDiscount);
+            }
+          });
+          discountForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            updateDiscount(product.id, discountInput.value);
+          });
+
           row.querySelector(".delete-product").addEventListener("click", function () {
             deleteProduct(product.id);
           });
@@ -211,7 +247,11 @@
           const items = [];
           for (let index = 0; index < order.items.length; index++) {
             const item = order.items[index];
-            items.push(item.name + " x " + item.quantity);
+            let name = item.name;
+            if (item.size) {
+              name += " (Size " + item.size + ")";
+            }
+            items.push(name + " x " + item.quantity);
           }
           row.querySelector(".items").textContent = items.join(", ");
           row.querySelector(".price").textContent = money(order.total);
@@ -258,6 +298,7 @@
         const color = document.getElementById("color").value.trim();
         const price = Math.round(Number(document.getElementById("price").value) * 100);
         const stock = Number(document.getElementById("stock").value);
+        const discount = readDiscount(document.getElementById("product-discount").value);
         const image = document.getElementById("product-photo").value.trim();
 
         if (!name || !category || !color) {
@@ -270,6 +311,10 @@
         }
         if (!Number.isInteger(stock) || stock < 0 || stock > 9999) {
           alert("Enter a valid stock quantity.");
+          return;
+        }
+        if (discount === null) {
+          alert("Enter a discount from 0% to 100%.");
           return;
         }
         if (image && !image.startsWith("https://") && !image.startsWith("http://")) {
@@ -286,6 +331,7 @@
           color: color,
           price: price,
           stock: stock,
+          discount: discount,
           image: image
         });
         saveProducts();
@@ -293,6 +339,51 @@
         document.getElementById("add-product-panel").open = false;
         showInventory(products);
         alert("Product added.");
+      }
+
+      function readDiscount(value) {
+        let text = value.trim();
+        if (text === "") {
+          return 0;
+        }
+        if (text.endsWith("%")) {
+          text = text.slice(0, -1).trim();
+        }
+
+        const discount = Number(text);
+        if (text === "" || !Number.isFinite(discount) || discount < 0 || discount > 100) {
+          return null;
+        }
+        return discount;
+      }
+
+      function showDiscountPrice(row, price, discount) {
+        const discountedPrice = Math.round(price * (100 - discount) / 100);
+        const originalPrice = row.querySelector(".original-price");
+        originalPrice.textContent = money(price);
+        originalPrice.hidden = discountedPrice === price;
+        row.querySelector(".discount-price").textContent = money(discountedPrice);
+      }
+
+      function updateDiscount(productId, value) {
+        if (!adminIsSignedIn()) {
+          return;
+        }
+        const discount = readDiscount(value);
+        if (discount === null) {
+          alert("Enter a discount from 0% to 100%.");
+          return;
+        }
+
+        loadProducts();
+        const product = findProduct(shop.products, productId);
+        if (!product) {
+          showInventory(shop.products);
+          return;
+        }
+        product.discount = discount;
+        saveProducts();
+        showInventory(shop.products);
       }
 
       function updateStock(productId, stock) {
@@ -532,8 +623,8 @@
         return orderId;
       }
 
-      function money(cents) {
-        return "$" + (cents / 100).toFixed(2);
+      function money(paise) {
+        return "₹" + (paise / 100).toFixed(2);
       }
 
       document.getElementById("sign-out").addEventListener("click", function () {
@@ -547,10 +638,9 @@
           showAdmin();
         }
       });
-      window.addEventListener("pageshow", function (event) {
-        if (event.persisted) {
-          window.location.reload();
-        }
+      window.addEventListener("pageshow", function () {
+        shop = readTab();
+        showAdmin();
       });
       showAdmin();
     </script>
