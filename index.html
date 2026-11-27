@@ -80,31 +80,6 @@
       </div>
     </footer>
 
-    <div class="panel shop-popover" id="product-options" popover role="dialog" aria-labelledby="options-product">
-      <div class="popover-heading">
-        <h2 id="options-product"></h2>
-        <button class="text-button" type="button" popovertarget="product-options" popovertargetaction="hide">Close</button>
-      </div>
-      <p class="price" id="options-price"></p>
-      <form class="stack-form" id="product-options-form">
-        <label for="product-size">Size</label>
-        <select id="product-size" required>
-          <option value="">Choose a size</option>
-          <option value="S">S</option>
-          <option value="M">M</option>
-          <option value="L">L</option>
-          <option value="XL">XL</option>
-        </select>
-        <p id="quantity-label">Quantity</p>
-        <div class="quantity-picker" role="group" aria-labelledby="quantity-label">
-          <button type="button" id="quantity-minus" aria-label="Decrease quantity">−</button>
-          <output id="product-quantity" aria-live="polite">1</output>
-          <button type="button" id="quantity-plus" aria-label="Increase quantity">+</button>
-        </div>
-        <button class="button" type="submit">Add to cart</button>
-      </form>
-    </div>
-
     <div class="panel shop-popover" id="shop-account" popover role="dialog" aria-labelledby="shop-account-title">
       <div class="popover-heading">
         <h2 id="shop-account-title">Sign in to shop</h2>
@@ -138,7 +113,30 @@
           </div>
         </div>
         <p class="product-color"></p>
-        <button class="button product-button" type="button">Add to cart</button>
+        <form class="product-options">
+          <div class="product-choices">
+            <label>
+              Size
+              <select class="product-size">
+                <option value="">Select</option>
+                <option value="S">S</option>
+                <option value="M">M</option>
+                <option value="L">L</option>
+                <option value="XL">XL</option>
+              </select>
+            </label>
+            <div role="group" aria-label="Quantity">
+              <p>Quantity</p>
+              <div class="quantity-picker">
+                <button class="quantity-minus" type="button" aria-label="Decrease quantity">−</button>
+                <output class="product-quantity">1</output>
+                <button class="quantity-plus" type="button" aria-label="Increase quantity">+</button>
+              </div>
+            </div>
+          </div>
+          <p class="product-message muted" role="status" hidden></p>
+          <button class="button product-button" type="submit">Add to cart</button>
+        </form>
       </article>
     </template>
 
@@ -149,14 +147,11 @@
       const productTemplate = document.getElementById("product-template");
       const signOutButton = document.getElementById("sign-out");
       const accountLink = document.getElementById("account-link");
-      const productOptions = document.getElementById("product-options");
       const shopAccount = document.getElementById("shop-account");
       const shopAccountForm = document.getElementById("shop-account-form");
       const accountMessage = document.getElementById("shop-account-message");
       let signingUp = false;
-      let selectedProductId = "";
-      let quantity = 1;
-      let quantityLimit = 1;
+      let pendingProduct = null;
 
       function showBagCount(cart) {
         let count = 0;
@@ -210,15 +205,7 @@
           }
           card.querySelector(".product-color").textContent = product.color;
 
-          const button = card.querySelector("button");
-          if (product.stock === 0) {
-            button.disabled = true;
-            button.textContent = "Out of stock";
-          }
-          button.addEventListener("click", function () {
-            chooseProduct(product.id);
-          });
-
+          setUpProductForm(card, product);
           productsList.appendChild(card);
         }
       }
@@ -241,75 +228,90 @@
         return count;
       }
 
-      function chooseProduct(productId) {
-        selectedProductId = productId;
-        if (!customerIsSignedIn()) {
-          openShopAccount();
-          return;
-        }
-        showProductOptions();
-      }
+      function setUpProductForm(card, product) {
+        const form = card.querySelector(".product-options");
+        const size = card.querySelector(".product-size");
+        const quantityOutput = card.querySelector(".product-quantity");
+        const minusButton = card.querySelector(".quantity-minus");
+        const plusButton = card.querySelector(".quantity-plus");
+        const addButton = card.querySelector(".product-button");
+        const message = card.querySelector(".product-message");
+        let quantity = 1;
 
-      function showProductOptions() {
-        loadProducts();
-        const product = findProduct(shop.products, selectedProductId);
-        if (!product) {
-          alert("This product is no longer available.");
-          return;
+        if (pendingProduct && pendingProduct.id === product.id) {
+          size.value = pendingProduct.size;
+          quantity = pendingProduct.quantity;
         }
 
-        quantityLimit = product.stock - quantityInBag(product.id);
-        if (quantityLimit < 1) {
-          alert("There is no more stock available for this item.");
-          return;
+        function showQuantity() {
+          const available = product.stock - quantityInBag(product.id);
+          if (available > 0 && quantity > available) {
+            quantity = available;
+          }
+          quantityOutput.textContent = quantity;
+          minusButton.disabled = quantity <= 1 || available < 1;
+          plusButton.disabled = quantity >= available;
+          size.disabled = available < 1;
+          addButton.disabled = available < 1;
+
+          if (product.stock === 0) {
+            addButton.textContent = "Out of stock";
+          } else if (available < 1) {
+            addButton.textContent = "All stock in cart";
+          } else {
+            addButton.textContent = "Add to cart";
+          }
         }
 
-        quantity = 1;
-        document.getElementById("product-size").value = "";
-        document.getElementById("options-product").textContent = product.name;
-        document.getElementById("options-price").textContent = money(salePrice(product));
-        showQuantity();
-        productOptions.showPopover();
-        document.getElementById("product-size").focus();
-      }
-
-      function showQuantity() {
-        document.getElementById("product-quantity").textContent = quantity;
-        document.getElementById("quantity-minus").disabled = quantity <= 1;
-        document.getElementById("quantity-plus").disabled = quantity >= quantityLimit;
-      }
-
-      function changeQuantity(change) {
-        const nextQuantity = quantity + change;
-        if (nextQuantity >= 1 && nextQuantity <= quantityLimit) {
-          quantity = nextQuantity;
+        minusButton.addEventListener("click", function () {
+          quantity--;
           showQuantity();
-        }
+        });
+        plusButton.addEventListener("click", function () {
+          quantity++;
+          showQuantity();
+        });
+        size.addEventListener("change", function () {
+          message.hidden = true;
+        });
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!customerIsSignedIn()) {
+            pendingProduct = { id: product.id, size: size.value, quantity: quantity };
+            openShopAccount();
+            return;
+          }
+          if (!size.value) {
+            message.textContent = "Choose a size.";
+            message.hidden = false;
+            size.focus();
+            return;
+          }
+          if (addToBag(product.id, size.value, quantity)) {
+            message.hidden = true;
+            quantity = 1;
+            showQuantity();
+          } else {
+            message.textContent = "There is not enough stock for this quantity.";
+            message.hidden = false;
+          }
+        });
+
+        showQuantity();
       }
 
-      function addToBag(event) {
-        event.preventDefault();
-        if (!customerIsSignedIn()) {
-          openShopAccount();
-          return;
-        }
-
+      function addToBag(productId, size, quantity) {
         loadProducts();
-        const product = findProduct(shop.products, selectedProductId);
-        const size = document.getElementById("product-size").value;
-        if (!size) {
-          return;
-        }
-        if (!product || quantity + quantityInBag(selectedProductId) > product.stock) {
-          alert("There is no more stock available for this item.");
-          return;
+        const product = findProduct(shop.products, productId);
+        if (!product || quantity + quantityInBag(productId) > product.stock) {
+          return false;
         }
 
         const cart = shop.cart;
         let cartItem = null;
         for (let index = 0; index < cart.length; index++) {
           const item = cart[index];
-          if (item.productId === selectedProductId && item.size === size) {
+          if (item.productId === productId && item.size === size) {
             cartItem = item;
             break;
           }
@@ -318,11 +320,11 @@
         if (cartItem) {
           cartItem.quantity += quantity;
         } else {
-          cart.push({ productId: selectedProductId, size: size, quantity: quantity });
+          cart.push({ productId: productId, size: size, quantity: quantity });
         }
         saveTab();
         showBagCount(cart);
-        productOptions.hidePopover();
+        return true;
       }
 
       function showShopSignUp(signUp) {
@@ -418,9 +420,7 @@
         shopAccountForm.reset();
         shopAccount.hidePopover();
         showProducts();
-        if (selectedProductId) {
-          showProductOptions();
-        }
+        pendingProduct = null;
       }
 
       function submitShopAccount(event) {
@@ -611,13 +611,6 @@
         window.name = "goodform-tab\n" + JSON.stringify(tab);
       }
 
-      document.getElementById("product-options-form").addEventListener("submit", addToBag);
-      document.getElementById("quantity-minus").addEventListener("click", function () {
-        changeQuantity(-1);
-      });
-      document.getElementById("quantity-plus").addEventListener("click", function () {
-        changeQuantity(1);
-      });
       document.getElementById("shop-show-sign-in").addEventListener("click", function () {
         showShopSignUp(false);
         document.getElementById("shop-email").focus();
@@ -631,7 +624,7 @@
       function openAccountForGuest(event) {
         if (!customerIsSignedIn()) {
           event.preventDefault();
-          selectedProductId = "";
+          pendingProduct = null;
           openShopAccount();
         }
       }

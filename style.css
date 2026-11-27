@@ -363,6 +363,34 @@ button:disabled {
   font-size: 0.875rem;
 }
 
+.product-options {
+  margin-top: 12px;
+}
+
+.product-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  font-size: 0.875rem;
+}
+
+.product-size {
+  display: block;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 8px;
+  border: 1px solid #817d71;
+  background-color: #fff;
+  color: #262820;
+  font: inherit;
+}
+
+.product-message {
+  margin-top: 8px;
+  font-size: 0.875rem;
+}
+
 .product-button {
   width: 100%;
   margin-top: 12px;
@@ -580,15 +608,11 @@ button:disabled {
   font-size: 1.75rem;
 }
 
-.shop-popover .price {
-  margin-bottom: 12px;
-}
-
 .quantity-picker {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 6px 0 12px;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .quantity-picker button {
